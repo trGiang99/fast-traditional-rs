@@ -4,6 +4,7 @@ from numba import njit
 from .sim_helper import _run_cosine_params, _calculate_cosine_similarity, _run_pearson_params, _calculate_pearson_similarity
 
 
+@timer("Computing Cosine similarity matrix took ")
 def _cosine(n_x, yr, min_support=1):
     """Compute the cosine similarity between all pairs of users (or items).
     Only **common** users (or items) are taken into account.
@@ -23,6 +24,7 @@ def _cosine(n_x, yr, min_support=1):
     return sim
 
 
+@timer("Computing Pearson similarity matrix took ")
 def _pcc(n_x, yr, min_support=1):
     """Compute the cosine similarity between all pairs of users (or items).
     Only **common** users (or items) are taken into account.
