@@ -76,14 +76,12 @@ class kNN:
             self.__normalize()
 
         # List where element `i` is ndarray of `(xs, ratings)` where `xs` is all x that rated y, and the ratings.
-        self.y_rated = []
+        self.y_rated = [[] for _ in range(self.n_y)]
         print("Listing all users rated each item (or vice versa if iiCF) ...")
-        for id in range(self.n_y):
-            col_i = self.utility.getcol(id)
-            ys_rated_x = col_i.nonzero()[0]
-            ratings = col_i.data
-
-            self.y_rated.append(np.dstack((ys_rated_x, ratings))[0])
+        for xid, yid, r in self.X:
+            self.y_rated[int(yid)].append([xid, r])
+        for idx in range(self.n_y):
+            self.y_rated[idx] = np.array(self.y_rated[idx])
 
         if sim is None:
             print('Computing similarity matrix ...')
