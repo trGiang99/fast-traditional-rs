@@ -21,7 +21,7 @@ class kNN:
         uuCF (boolean, optional): True if using user-based CF, False if using item-based CF. Defaults to `False`.
         normalize (str, optional): Normalization method. Defaults to `None`.
         verbose (boolean): Show predicting progress. Defaults to `False`.
-        awareness_constrain (boolean): Only for Baseline model (besides, considered `False`). If `True`, the model must aware of all users and items in the test set, which means that these users and items are in the train set as well. This constrain helps speed up the predicting process (by 1.5 times) but if a user of an item is unknown, kNN will fail to give prediction. Defaults to `False`.
+        awareness_constrain (boolean): If `True`, the model must aware of all users and items in the test set, which means that these users and items are in the train set as well. This constrain helps speed up the predicting process (up to 1.5 times) but if a user of an item is unknown, kNN will fail to give prediction. Defaults to `False`.
     """
     def __init__(self, k, min_k=1, distance="cosine", uuCF=False, normalize="none", verbose=False, awareness_constrain=False):
         self.k = k
@@ -158,19 +158,20 @@ class kNN:
             return pred
 
         else:
-            x_known, y_known = False, False
+            if not self.awareness_constrain:
+                x_known, y_known = False, False
 
-            if x_id in self.x_list:
-                x_known = True
-            if y_id in self.y_list:
-                y_known = True
+                if x_id in self.x_list:
+                    x_known = True
+                if y_id in self.y_list:
+                    y_known = True
 
-            if not (x_known and y_known):
-                if self.uuCF:
-                    print(f"Can not predict rating of user {x_id} for item {y_id}.")
-                else:
-                    print(f"Can not predict rating of user {y_id} for item {x_id}.")
-                return self.global_mean
+                if not (x_known and y_known):
+                    if self.uuCF:
+                        print(f"Can not predict rating of user {x_id} for item {y_id}.")
+                    else:
+                        print(f"Can not predict rating of user {y_id} for item {x_id}.")
+                    return self.global_mean
 
             if self.__normalize == self.__mean_normalize:
                 pred = _predict_mean(x_id, y_id, self.y_rated[y_id], self.mu, self.S, self.k, self.min_k)
