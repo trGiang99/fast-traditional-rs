@@ -167,10 +167,10 @@ class kNN:
                     y_known = True
 
                 if not (x_known and y_known):
-                    if self.uuCF:
-                        print(f"Can not predict rating of user {x_id} for item {y_id}.")
-                    else:
-                        print(f"Can not predict rating of user {y_id} for item {x_id}.")
+                    # if self.uuCF:
+                    #     print(f"Can not predict rating of user {x_id} for item {y_id}.")
+                    # else:
+                    #     print(f"Can not predict rating of user {y_id} for item {x_id}.")
                     return self.global_mean
 
             if self.__normalize == self.__mean_normalize:
