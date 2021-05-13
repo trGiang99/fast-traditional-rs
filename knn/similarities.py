@@ -1,5 +1,6 @@
 import numpy as np
-from numba import njit
+from utils import timer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from .sim_helper import _run_cosine_params, _calculate_cosine_similarity, _run_pearson_params, _calculate_pearson_similarity
 
@@ -46,7 +47,7 @@ def _pcc(n_x, yr, min_support=1):
     return sim
 
 
-@njit
+@timer("Computing Cosine similarity for Tag Genome matrix took ")
 def _cosine_genome(genome):
     """Calculate cosine simularity score between each movie
     using movie genome provided by MovieLens20M dataset.
@@ -57,23 +58,10 @@ def _cosine_genome(genome):
     Returns:
         S (ndarray): Similarity matrix
     """
-    S = np.zeros((genome.shape[0], genome.shape[0]))
-
-    for uidx in range(genome.shape[0]):
-        for vidx in range(genome[(uidx+1):].shape[0]):
-            numerator = genome[uidx].dot(genome[vidx+uidx+1])
-            if (not numerator):
-                S[uidx,vidx+uidx+1] = 0
-                continue
-
-            norm2_ratings_u = norm_np(genome[uidx])
-            norm2_ratings_v = norm_np(genome[vidx+uidx+1])
-
-            S[uidx,vidx+uidx+1] = (numerator / (norm2_ratings_u * norm2_ratings_v))
-
-    return S
+    return cosine_similarity(genome, genome)
 
 
+@timer("Computing Pearson similarity for Tag Genome matrix took ")
 def _pcc_genome(genome):
     """Calculate Pearson correlation coefficient (pcc) simularity score between each movie
     using movie genome provided by MovieLens20M dataset.

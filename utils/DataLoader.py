@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from scipy import sparse
 
 
 class DataLoader:
@@ -59,8 +60,11 @@ class DataLoader:
         Returns:
             ndarray: The array with all id mapped.
         """
-        data['u_id'] = data['u_id'].replace(self.user_dict)
-        data['i_id'] = data['i_id'].replace(self.item_dict)
+        # data['u_id'] = data['u_id'].replace(self.user_dict)
+        # data['i_id'] = data['i_id'].replace(self.item_dict)
+
+        data['u_id'] = data['u_id'].map(self.user_dict)
+        data['i_id'] = data['i_id'].map(self.item_dict)
 
         # Tag unknown users/items with -1 (when val)
         data.fillna(-1, inplace=True)
