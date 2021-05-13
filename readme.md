@@ -1,4 +1,6 @@
-# Recommender System on MovieLens 20M Dataset (working in progress)
+# Fast Recommender System on MovieLens 20M Dataset (working in progress)
+Inspired by [gbolmler implementation of SVD using numba](https://github.com/gbolmier/funk-svd).
+This repo contains reimplementation of kNN and common matrix factorization methods using [numba](https://github.com/numba/numba) library to accelarate `numpy` operations. Numba is a cool library and you need to give this a shot for future implementation using `numpy`.
 
 ## Dataset
 In this repo, I'm using the Movielens 20M Dataset from [Kaggle](https://www.kaggle.com/grouplens/movielens-20m-dataset).
@@ -21,39 +23,8 @@ if __name__ == "__main__":
 where `"movielens20M"` is the folder contains MovieLens 20M Dataset, `"movielens-sample"` is the folder contains new extracted dataset.
 Size of the extracted dataset can be changed via `sample_size`.
 
-## Run the Algorithm
-`main.py` is where all the magic happens.
+## Benchmarks
 
-```python
-train_data, test_data = DataLoader("movielens-sample", test_ratio=0.2).load()
-```
+Folder `/example` contains test runs on MovieLens 20M dataset.
 
-Update the folder name where you put the sampling data (or the whole MovieLens 20M dataset), change `test_ratio` (default ratio is 0.1).
-
-The main focus here is
-```python
-knn = kNN(data=train_data, k=5, distance="cosine", uuCF=1, normalize="none")
-```
-where `k` is the number of nearest neibors use in prediction,
-`distance` is the distance function (you can choose from `"cosine"` or `"pearson"`),
-`normalize` is the normalization method (`"mean"` or `"baseline"` or `"none"` if you will),
-and `uuCF` is set to 1 if using user-based CF, 0 if using item-based CF.
-
-Then on your terminal (Windows), run
-```
-py main.py
-```
-
-After a while, final RMSE score will be display to the terminal, and also the runtime.
-On a 10k sample of MovieLens:
-```
-Reimlementation of KNN with mean normalization:
-RMSE: 1.053001464575583
-Runtime: 5.73391056060791 seconds.
-
-KNN with mean normalization from NicolasHug/Surprise:
-Computing the cosine similarity matrix...
-Done computing similarity matrix.
-RMSE: 1.0634
-```
-Compare to [NicolasHug/Surprise](https://github.com/NicolasHug/Surprise), the runtime is bad with this small sample, but can be improved.
+Compare to [NicolasHug/Surprise](https://github.com/NicolasHug/Surprise), the runtime of kNNBaseline using Pearson similarity scores is much faster (817s compared to 3166s of Surprise).
