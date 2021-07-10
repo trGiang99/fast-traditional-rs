@@ -4,7 +4,7 @@ from utils import timer
 
 
 @timer(text='\nSampling took ')
-def sample_movielens(movielens_path, movielens_sample_path, sample_size=10000, test_ratio=0.2, val_ratio=0.05):
+def sample_movielens(movielens_path, movielens_sample_path, sample_size=10000, test_ratio=0.2, val_ratio=0.05, sample_genome=False):
     """Sampling the original MovieLens Dataset into a dataset contain only 10k row
     All movies that doesn't appear in the raing file will be remove from the original movies.csv
     Also the genome_tags and genome_score.
@@ -53,25 +53,28 @@ def sample_movielens(movielens_path, movielens_sample_path, sample_size=10000, t
         writer.writerows(train_set)
     with open(movielens_sample_path + "/rating_test.csv", 'w', encoding="utf-8", newline='') as test_file:
         writer = csv.writer(test_file)
+        writer.writerow(['userId', 'movieId', 'rating', 'timestamp'])
         writer.writerows(test_set)
     with open(movielens_sample_path + "/rating_val.csv", 'w', encoding="utf-8", newline='') as val_file:
         writer = csv.writer(val_file)
+        writer.writerow(['userId', 'movieId', 'rating', 'timestamp'])
         writer.writerows(val_set)
     print("Done.")
 
-    print("\nReading genome tags file...")
-    genome_scores = []
-    # Get all genome score for the Ids in the movie_list above
-    with open(movielens_path + "/genome_scores.csv", "r", encoding="utf-8") as scores:
-        reader = csv.reader(scores)
-        genome_scores = [score for _, score in enumerate(reader) if score[0] in movies_list]
+    if sample_genome:
+        print("\nReading genome tags file...")
+        genome_scores = []
+        # Get all genome score for the Ids in the movie_list above
+        with open(movielens_path + "/genome_scores.csv", "r", encoding="utf-8") as scores:
+            reader = csv.reader(scores)
+            genome_scores = [score for _, score in enumerate(reader) if score[0] in movies_list]
 
-    print("Writing genome tags...")
-    # Write all needed score to new path
-    with open(movielens_sample_path + "/genome_scores.csv", 'w', encoding="utf-8", newline='') as scores:
-        writer = csv.writer(scores)
-        writer.writerows(genome_scores)
-    print("Done.")
+        print("Writing genome tags...")
+        # Write all needed score to new path
+        with open(movielens_sample_path + "/genome_scores.csv", 'w', encoding="utf-8", newline='') as scores:
+            writer = csv.writer(scores)
+            writer.writerows(genome_scores)
+        print("Done.")
 
     # print("Reading movies information...")
     # # Get information of all movies and assign it to the Ids in movie_list respectively
@@ -89,4 +92,4 @@ def sample_movielens(movielens_path, movielens_sample_path, sample_size=10000, t
 if __name__ == "__main__":
 
     # Sampling MovieLens 20M Dataset to MovieLens 10k Dataset for the sake of testing
-    sample_movielens("movielens20M", "movielens10k", sample_size=10000)
+    sample_movielens("movielens20M", "movielens10k", sample_size=10000, sample_genome=False)
