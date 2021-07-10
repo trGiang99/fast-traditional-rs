@@ -3,31 +3,60 @@ from numba import njit
 
 
 @njit
-def _baseline_sgd(X, global_mean, n_users, n_items, n_epochs=20, lr=0.005, reg=0.02):
+def _baseline_sgd(X, global_mean, n_x, n_y, n_epochs=20, lr=0.005, reg=0.02):
     """Optimize biases using SGD.
     Args:
         X (ndarray): the training set with size (|TRAINSET|, 3)
         global_mean (float): mean ratings in training set
-        n_users (np.array): number of users
-        n_items (np.array): number of items
+        n_x (np.array): number of users
+        n_y (np.array): number of items
         n_epochs (int): number of iterations to train
         lr (float): the learning rate
         reg (float): the regularization strength
     Returns:
-        A tuple ``(bu, bi)``, which are users and items baselines.
+        A tuple ``(bx, by)``, which are users and items baselines.
     """
 
-    bu = np.zeros(n_users)
-    bi = np.zeros(n_items)
+    bx = np.zeros(n_x)
+    by = np.zeros(n_y)
 
-    for dummy in range(n_epochs):
+    for _ in range(n_epochs):
         for i in range(X.shape[0]):
-            user, item, rating = int(X[i, 0]), int(X[i, 1]), X[i, 2]
-            err = (rating - (global_mean + bu[user] + bi[item]))
-            bu[user] += lr * (err - reg * bu[user])
-            bi[item] += lr * (err - reg * bi[item])
+            x, y, rating = int(X[i, 0]), int(X[i, 1]), X[i, 2]
+            err = (rating - (global_mean + bx[x] + by[y]))
+            bx[x] += lr * (err - reg * bx[x])
+            by[y] += lr * (err - reg * by[y])
 
-    return bu, bi
+    return bx, by
+
+
+@njit
+def _baseline_als(X, global_mean, n_x, n_y, x_rated, y_ratedby, n_epochs=10, reg_x=15, reg_y=10):
+    """Optimize biases using ALS.
+    Args:
+        self: The algorithm that needs to compute baselines.
+    Returns:
+        A tuple ``(bx, by)``, which are users and items baselines.
+    """
+
+    bx = np.zeros(n_x)
+    by = np.zeros(n_y)
+
+    for _ in range(n_epochs):
+        for y in range(n_y):
+            dev_y = 0
+            for x, r in x_rated[y]:
+                dev_y += r - global_mean - bx[int(x)]
+
+            by[y] = dev_y / (reg_y + x_rated[y].shape[0])
+
+        for x in range(n_x):
+            dev_x = 0
+            for y, r in y_ratedby[x]:
+                dev_x += r - global_mean - by[int(y)]
+            bx[x] = dev_x / (reg_x + y_ratedby[x].shape[0])
+
+    return bx, by
 
 
 @njit
@@ -45,6 +74,8 @@ def _predict(x_id, y_id, y_rated, S, k, k_min):
     """
 
     k_neighbors = np.zeros((k, 2))
+    k_neighbors[:, 1] = -1          # All similarity degree is default to -1
+
     for x2, rating in y_rated:
         if int(x2) == x_id:
             continue       # Bo qua item dang xet
@@ -86,6 +117,8 @@ def _predict_mean(x_id, y_id, y_rated, mu, S, k, k_min):
     """
 
     k_neighbors = np.zeros((k, 3))
+    k_neighbors[:, 1] = -1          # All similarity degree is default to -1
+
     for x2, rating in y_rated:
         if int(x2) == x_id:
             continue       # Bo qua item dang xet
@@ -131,6 +164,8 @@ def _predict_baseline(x_id, y_id, y_rated, S, k, k_min, global_mean, bx, by):
     """
 
     k_neighbors = np.zeros((k, 3))
+    k_neighbors[:, 1] = -1          # All similarity degree is default to -1
+
     for x2, rating in y_rated:
         if int(x2) == x_id:
             continue       # Bo qua item dang xet
