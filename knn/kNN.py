@@ -48,17 +48,8 @@ class kNN:
         self.n_x = len(self.x_list)
         self.n_y = len(self.y_list)
 
-        self.x_rated = [[] for _ in range(self.n_y)]        # List where element `i` is ndarray of `(x, rating)` where `x` is all x that rated y, and the ratings.
-        self.y_ratedby = [[] for _ in range(self.n_x)]      # List where element `i` is ndarray of `(y, rating)` where `y` is all y that rated by x, and the ratings.
-        print("Listing all users rated each item (or vice versa if iiCF) ...")
-        for xid, yid, r in self.X:
-            self.x_rated[int(yid)].append([xid, r])
-            self.y_ratedby[int(xid)].append([yid, r])
-
-        for yid in range(self.n_y):
-            self.x_rated[yid] = np.array(self.x_rated[yid])
-        for xid in range(self.n_x):
-            self.y_ratedby[xid] = np.array(self.y_ratedby[xid])
+        print("Listing all users rated each item, and all items rated by each user ...")
+        self.list_ur_ir()
 
         if similarity_matrix is None:
             print('Computing similarity matrix ...')
@@ -81,7 +72,7 @@ class kNN:
             self.S = similarity_matrix
 
     @timer("Time for predicting: ")
-    def predict(self, test_set):
+    def predict(self, test_set, min_rating=0.5, max_rating=5, clip=True):
         """Returns estimated ratings of several given user/item pairs.
         Args:
             test_set (adarray): storing all user/item pairs we want to predict the ratings.
@@ -91,9 +82,10 @@ class kNN:
         if not self.uuCF:
             test_set[:, [0, 1]] = test_set[:, [1, 0]]     # Swap user_id column to movie_id column
 
-        self.predictions = []
         self.ground_truth = test_set[:, 2]
         n_pairs = test_set.shape[0]
+
+        self.predictions = np.zeros(n_pairs)
 
         print(f"Predicting {n_pairs} pairs of user-item ...")
 
@@ -101,14 +93,16 @@ class kNN:
             bar = progressbar.ProgressBar(maxval=n_pairs, widgets=[progressbar.Bar(), ' ', progressbar.Percentage()])
             bar.start()
             for pair in range(n_pairs):
-                self.predictions.append(self.predict_pair(test_set[pair, 0].astype(int), test_set[pair, 1].astype(int)))
+                self.predictions[pair] = self.predict_pair(test_set[pair, 0].astype(int), test_set[pair, 1].astype(int))
                 bar.update(pair + 1)
             bar.finish()
         else:
             for pair in range(n_pairs):
-                self.predictions.append(self.predict_pair(test_set[pair, 0].astype(int), test_set[pair, 1].astype(int)))
+                self.predictions[pair] = self.predict_pair(test_set[pair, 0].astype(int), test_set[pair, 1].astype(int))
 
-        self.predictions = np.array(self.predictions)
+        if clip:
+            np.clip(self.predictions, min_rating, max_rating, out=self.predictions)
+
         return self.predictions
 
     def predict_pair(self, x_id, y_id):
@@ -167,3 +161,23 @@ class kNN:
         """
         mae_ = np.mean(np.abs(self.predictions - self.ground_truth))
         print(f"MAE: {mae_:.5f}")
+
+    @timer("Listing took ")
+    def list_ur_ir(self):
+        """Listing all users rated each item, and all items rated by each user.
+        If uuCF, x denotes user and y denotes item.
+        All users who rated each item are stored in list `x_rated`.
+        All items who rated by each user are stored in list `y_ratedby`.
+        The denotation are reversed if iiCF.
+        """
+        self.x_rated = [[] for _ in range(self.n_y)]        # List where element `i` is ndarray of `(x, rating)` where `x` is all x that rated y, and the ratings.
+        self.y_ratedby = [[] for _ in range(self.n_x)]      # List where element `i` is ndarray of `(y, rating)` where `y` is all y that rated by x, and the ratings.
+
+        for xid, yid, r in self.X:
+            self.x_rated[int(yid)].append([xid, r])
+            self.y_ratedby[int(xid)].append([yid, r])
+
+        for yid in range(self.n_y):
+            self.x_rated[yid] = np.array(self.x_rated[yid])
+        for xid in range(self.n_x):
+            self.y_ratedby[xid] = np.array(self.y_ratedby[xid])
