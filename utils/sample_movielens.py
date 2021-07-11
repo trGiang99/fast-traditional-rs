@@ -92,4 +92,4 @@ def sample_movielens(movielens_path, movielens_sample_path, sample_size=10000, t
 if __name__ == "__main__":
 
     # Sampling MovieLens 20M Dataset to MovieLens 10k Dataset for the sake of testing
-    sample_movielens("movielens20M", "movielens10k", sample_size=10000, sample_genome=False)
+    sample_movielens("movielens20M", "movielens100k", sample_size=100000, sample_genome=False)
