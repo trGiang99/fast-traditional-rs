@@ -57,9 +57,9 @@ class kNNBaseline(kNN):
         pred = _predict_baseline(x_id, y_id, self.x_rated[y_id], self.S, self.k, self.min_k, self.global_mean, self.bx, self.by)
         return pred
 
+    @timer("Time for computing the baseline estimate: ")
     def __baseline(self, baseline_options):
-        """Normalize the utility matrix.
-        Compute the baseline estimate for all user and movie using the following fomular.
+        """Compute the baseline estimate for all user and movie using the following fomular.
         b_{ui} = \mu + b_u + b_i
         """
         if baseline_options['method'] == 'als':
