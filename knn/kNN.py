@@ -8,17 +8,15 @@ from .knn_helper import _predict
 
 
 class kNN:
-    """Reimplementation of kNN argorithm.
+    """Reimplementation of basic kNN alrgorithm.
 
     Args:
-        k (int): Number of neibors use in prediction
         min_k (int): The minimum number of neighbors to take into account for aggregation. If there are not enough neighbors, the neighbor aggregation is set to zero
         uuCF (boolean, optional): True if using user-based CF, False if using item-based CF. Defaults to `False`.
         verbose (boolean): Show predicting progress. Defaults to `False`.
         awareness_constrain (boolean): If `True`, the model must aware of all users and items in the test set, which means that these users and items are in the train set as well. This constrain helps speed up the predicting process (up to 1.5 times) but if a user of an item is unknown, kNN will fail to give prediction. Defaults to `False`.
     """
-    def __init__(self, k, min_k=1, uuCF=False, verbose=False, awareness_constrain=False):
-        self.k = k
+    def __init__(self, min_k=1, uuCF=False, verbose=False, awareness_constrain=False):
         self.min_k = min_k
 
         self.uuCF = uuCF
@@ -38,7 +36,7 @@ class kNN:
         self.X = train_data.copy()
 
         if not self.uuCF:
-            self.X[:, [0, 1]] = self.X[:, [1, 0]]     # Swap user_id column to movie_id column
+            self.X[:, [0, 1]] = self.X[:, [1, 0]]     # Swap user_id column to movie_id column if using iiCF
 
         self.global_mean = np.mean(self.X[:, 2])
 
@@ -72,22 +70,29 @@ class kNN:
             self.S = similarity_matrix
 
     @timer("Time for predicting: ")
-    def predict(self, test_set, min_rating=0.5, max_rating=5, clip=True):
+    def predict(self, test_set, k, min_rating=0.5, max_rating=5, clip=True):
         """Returns estimated ratings of several given user/item pairs.
         Args:
             test_set (adarray): storing all user/item pairs we want to predict the ratings.
+            k (int): Number of neighbors use in prediction
+            min_rating (float): the minimum value for rating prediction.
+            max_rating (float): the maximum value for rating prediction.
+            clip (boolean): if True, clip the prediction based on the min and max value.
         Returns:
             predictions (ndarray): Storing all predictions of the given user/item pairs.
         """
+        self.k = k
+
+        test_set = test_set.copy()
         if not self.uuCF:
-            test_set[:, [0, 1]] = test_set[:, [1, 0]]     # Swap user_id column to movie_id column
+            test_set[:, [0, 1]] = test_set[:, [1, 0]]     # Swap user_id column to movie_id column if using iiCF
 
         self.ground_truth = test_set[:, 2]
         n_pairs = test_set.shape[0]
 
         self.predictions = np.zeros(n_pairs)
 
-        print(f"Predicting {n_pairs} pairs of user-item ...")
+        print(f"Predicting {n_pairs} pairs of user-item with k={self.k} ...")
 
         if self.verbose:
             bar = progressbar.ProgressBar(maxval=n_pairs, widgets=[progressbar.Bar(), ' ', progressbar.Percentage()])

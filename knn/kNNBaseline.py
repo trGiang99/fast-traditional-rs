@@ -6,7 +6,7 @@ from .knn_helper import _baseline_sgd, _baseline_als, _predict_baseline
 
 
 class kNNBaseline(kNN):
-    """Reimplementation of kNNBaseline argorithm.
+    """Reimplementation of kNNBaseline alrgorithm.
 
     Args:
         k (int): Number of neibors use in prediction
@@ -64,7 +64,7 @@ class kNNBaseline(kNN):
         """
         if baseline_options['method'] == 'als':
             self.bx, self.by = _baseline_als(
-                self.X, self.global_mean
+                self.global_mean
                 , self.n_x, self.n_y
                 , self.x_rated, self.y_ratedby
                 , baseline_options['n_epochs']

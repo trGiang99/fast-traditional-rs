@@ -8,7 +8,7 @@ from .knn_helper import _predict_mean
 
 
 class kNNwithMean(kNN):
-    """Reimplementation of kNN with mean argorithm.
+    """Reimplementation of kNN with mean alrgorithm.
 
     Args:
         k (int): Number of neibors use in prediction

@@ -31,10 +31,15 @@ def _baseline_sgd(X, global_mean, n_x, n_y, n_epochs=20, lr=0.005, reg=0.02):
 
 
 @njit
-def _baseline_als(X, global_mean, n_x, n_y, x_rated, y_ratedby, n_epochs=10, reg_x=15, reg_y=10):
+def _baseline_als(global_mean, n_x, n_y, x_rated, y_ratedby, n_epochs=10, reg_x=15, reg_y=10):
     """Optimize biases using ALS.
     Args:
-        self: The algorithm that needs to compute baselines.
+        global_mean (float): mean ratings in training set
+        n_x (np.array): number of users
+        n_y (np.array): number of items
+        n_epochs (int): number of iterations to train
+        reg_x (float): regularization term for vector bx
+        reg_y (float): regularization term for vector by
     Returns:
         A tuple ``(bx, by)``, which are users and items baselines.
     """
