@@ -18,7 +18,7 @@ class kNNBaseline(kNN):
         awareness_constrain (boolean): If `True`, the model must aware of all users and items in the test set, which means that these users and items are in the train set as well. This constrain helps speed up the predicting process (up to 1.5 times) but if a user of an item is unknown, kNN will fail to give prediction. Defaults to `False`.
     """
 
-    def fit(self, train_data, similarity_measure="cosine", genome=None, similarity_matrix=None, baseline_options={'method':'als','n_epochs': 10,'reg_u':15,'reg_i':10}):
+    def fit(self, train_set, similarity_measure="cosine", genome=None, similarity_matrix=None, baseline_options={'method':'als','n_epochs': 10,'reg_u':15,'reg_i':10}):
         """Fit data (utility matrix) into the predicting model.
 
         Args:
@@ -28,7 +28,7 @@ class kNNBaseline(kNN):
             similarity_matrix (ndarray): Pre-calculate similarity matrix.  Defaults to "None".
             baseline_options(dict): Used to configure how to compute baseline estimate.
         """
-        kNN.fit(self, train_data, similarity_measure, genome, similarity_matrix)
+        kNN.fit(self, train_set, similarity_measure, genome, similarity_matrix)
         self.__baseline(baseline_options)
 
     def predict_pair(self, x_id, y_id):

@@ -18,7 +18,7 @@ class kNNwithMean(kNN):
         awareness_constrain (boolean): If `True`, the model must aware of all users and items in the test set, which means that these users and items are in the train set as well. This constrain helps speed up the predicting process (up to 1.5 times) but if a user of an item is unknown, kNN will fail to give prediction. Defaults to `False`.
     """
 
-    def fit(self, train_data, similarity_measure="cosine", genome=None, similarity_matrix=None):
+    def fit(self, train_set, similarity_measure="cosine", genome=None, similarity_matrix=None):
         """Fit data (utility matrix) into the predicting model.
 
         Args:
@@ -27,7 +27,7 @@ class kNNwithMean(kNN):
             genome (ndarray): Movie genome scores from MovieLens 20M. Defaults to "None".
             similarity_matrix (ndarray): Pre-calculate similarity matrix.  Defaults to "None".
         """
-        kNN.fit(self, train_data, similarity_measure, genome, similarity_matrix)
+        kNN.fit(self, train_set, similarity_measure, genome, similarity_matrix)
 
         self.utility = sparse.csr_matrix((
                 self.X[:, 2],
