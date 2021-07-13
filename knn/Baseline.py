@@ -27,10 +27,10 @@ class Baseline:
         self.n_y = len(np.unique(self.X[:, 1]))       # For uuCF, y -> item
 
         self.global_mean = np.mean(self.X[:, 2])
-        self.__baseline(baseline_options)
+        self.baseline(baseline_options)
 
     @timer("Time for computing the baseline estimate: ")
-    def __baseline(self, baseline_options):
+    def baseline(self, baseline_options):
         """Compute the baseline estimate for all user and movie using the following fomular.
         b_{ui} = \mu + b_u + b_i
         """
