@@ -24,16 +24,16 @@ class kNN:
         self.verbose = verbose
         self.awareness_constrain = awareness_constrain
 
-    def fit(self, train_data, similarity_measure="cosine", genome=None, similarity_matrix=None):
+    def fit(self, train_set, similarity_measure="cosine", genome=None, similarity_matrix=None):
         """Fit data (utility matrix) into the predicting model.
 
         Args:
-            data (ndarray): Training data.
+            train_set (ndarray): Training data.
             similarity_measure (str, optional): Similarity measure function. Defaults to "cosine".
             genome (ndarray): Movie genome scores from MovieLens 20M. Defaults to "None".
             similarity_matrix (ndarray): Pre-calculate similarity matrix.  Defaults to "None".
         """
-        self.X = train_data.copy()
+        self.X = train_set.copy()
 
         if not self.uuCF:
             self.X[:, [0, 1]] = self.X[:, [1, 0]]     # Swap user_id column to movie_id column if using iiCF
