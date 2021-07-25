@@ -2,11 +2,12 @@ import numpy as np
 
 from utils import timer
 from .kNN import kNN
-from .knn_helper import _baseline_sgd, _baseline_als, _predict_baseline
+from .knn_helper import _predict_baseline
+from .baseline_helper import _run_baseline_sgd, _run_baseline_als
 
 
 class kNNBaseline(kNN):
-    """Reimplementation of kNNBaseline argorithm.
+    """Reimplementation of kNNBaseline alrgorithm.
 
     Args:
         k (int): Number of neibors use in prediction
@@ -17,7 +18,7 @@ class kNNBaseline(kNN):
         awareness_constrain (boolean): If `True`, the model must aware of all users and items in the test set, which means that these users and items are in the train set as well. This constrain helps speed up the predicting process (up to 1.5 times) but if a user of an item is unknown, kNN will fail to give prediction. Defaults to `False`.
     """
 
-    def fit(self, train_data, similarity_measure="cosine", genome=None, similarity_matrix=None, baseline_options={'method':'als','n_epochs': 10,'reg_u':15,'reg_i':10}):
+    def fit(self, train_set, similarity_measure="cosine", genome=None, similarity_matrix=None, baseline_options={'method':'als','n_epochs': 10,'reg_u':15,'reg_i':10}):
         """Fit data (utility matrix) into the predicting model.
 
         Args:
@@ -27,7 +28,7 @@ class kNNBaseline(kNN):
             similarity_matrix (ndarray): Pre-calculate similarity matrix.  Defaults to "None".
             baseline_options(dict): Used to configure how to compute baseline estimate.
         """
-        kNN.fit(self, train_data, similarity_measure, genome, similarity_matrix)
+        kNN.fit(self, train_set, similarity_measure, genome, similarity_matrix)
         self.__baseline(baseline_options)
 
     def predict_pair(self, x_id, y_id):
@@ -62,20 +63,36 @@ class kNNBaseline(kNN):
         """Compute the baseline estimate for all user and movie using the following fomular.
         b_{ui} = \mu + b_u + b_i
         """
+        bx = np.zeros(self.n_x)
+        by = np.zeros(self.n_y)
+
+        self.__supported_baseline_optimizer = ['als', 'sgd']
+        assert baseline_options['method'] in self.__supported_baseline_optimizer, f"Similarity measure function should be one of {self.__supported_baseline_optimizer}"
+
         if baseline_options['method'] == 'als':
-            self.bx, self.by = _baseline_als(
-                self.X, self.global_mean
-                , self.n_x, self.n_y
-                , self.x_rated, self.y_ratedby
-                , baseline_options['n_epochs']
-                , baseline_options['reg_u']
-                , baseline_options['reg_i']
-            )
+            n_epochs = baseline_options.get('n_epochs', 10)
+            reg_x = baseline_options.get('reg_u', 15)
+            reg_y = baseline_options.get('reg_i', 10)
+            if not self.uuCF:
+                reg_x, reg_y = reg_y, reg_x
+
+            for epoch in range(n_epochs):
+                bx, by = _run_baseline_als(
+                    bx, by, self.global_mean
+                    , self.n_x, self.n_y
+                    , self.x_rated, self.y_ratedby
+                    , reg_x, reg_y
+                )
+
         elif baseline_options['method'] == 'sgd':
-            self.bx, self.by = _baseline_sgd(
-                self.X, self.global_mean
-                , self.n_x, self.n_y
-                , baseline_options['n_epochs']
-                , baseline_options['learning_rate']
-                , baseline_options['regularization']
-            )
+            n_epochs = baseline_options.get('n_epochs', 20)
+            lr = baseline_options.get('learning_rate', 0.005)
+            reg = baseline_options.get('regularization', 0.02)
+
+            for epoch in range(n_epochs):
+                bx, by = _run_baseline_sgd(
+                    self.X, bx, by, self.global_mean
+                    , lr, reg
+                )
+
+        self.bx, self.by = bx, by
