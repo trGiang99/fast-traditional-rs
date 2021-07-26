@@ -6,78 +6,20 @@ import time
 import pickle
 
 from utils import timer
-from .helper import _run_svd_epoch, _compute_svd_val_metrics, _shuffle
+from .helper import _run_svdpp_epoch, _compute_svdpp_val_metrics, _shuffle
+from .svd import svd
 
-
-class svd:
-    """Implements Simon Funk SVD algorithm engineered during the Netflix Prize.
-    Attributes:
-        lr (float): learning rate.
-        reg (float): regularization factor.
-        n_epochs (int): number of SGD iterations.
-        n_factors (int): number of latent factors.
-        global_mean (float): ratings arithmetic mean.
-        pu (numpy array): users latent factor matrix.
-        qi (numpy array): items latent factor matrix.
-        bu (numpy array): users biases vector.
-        bi (numpy array): items biases vector.
-        early_stopping (boolean): whether or not to stop training based on a
-            validation monitoring.
-        shuffle (boolean): whether or not to shuffle data before each epoch.
-    """
-
-    def __init__(self, learning_rate=.005, lr_pu=None, lr_qi=None, lr_bu=None, lr_bi=None,
-                 regularization=0.02, reg_pu=None, reg_qi=None, reg_bu=None, reg_bi=None,
+class svdpp(svd):
+    def __init__(self, learning_rate=.005, lr_pu=None, lr_qi=None, lr_bu=None, lr_bi=None, lr_yj=None,
+                 regularization=0.02, reg_pu=None, reg_qi=None, reg_bu=None, reg_bi=None, reg_yj=None,
                  n_epochs=20, n_factors=100, min_rating=1, max_rating=5, i_factor=None, u_factor=None):
+        svd.__init__(self, learning_rate, lr_pu, lr_qi, lr_bu, lr_bi,
+                 regularization, reg_pu, reg_qi, reg_bu, reg_bi,
+                 n_epochs, n_factors, min_rating, max_rating, i_factor, u_factor)
+        self.lr_yj = lr_yj if lr_yj is not None else learning_rate
+        self.reg_yj = reg_yj if reg_yj is not None else regularization
 
-        self.lr_pu = lr_pu if lr_pu is not None else learning_rate
-        self.lr_qi = lr_qi if lr_qi is not None else learning_rate
-        self.lr_bu = lr_bu if lr_bu is not None else learning_rate
-        self.lr_bi = lr_bi if lr_bi is not None else learning_rate
-
-        self.reg_pu = reg_pu if reg_pu is not None else regularization
-        self.reg_qi = reg_qi if reg_qi is not None else regularization
-        self.reg_bu = reg_bu if reg_bu is not None else regularization
-        self.reg_bi = reg_bi if reg_bi is not None else regularization
-
-        self.n_epochs = n_epochs
-        self.n_factors = n_factors
-        self.min_rating = min_rating
-        self.max_rating = max_rating
-        self.early_stopping = False
-        self.shuffle = False
-        self.global_mean = np.nan
-        self.metrics_ = None
-        self.min_delta_ = 0.001
-
-    def _preprocess_data(self, X, train=True):
-        """Maps users and items ids to indexes and returns a numpy array.
-        Args:
-            X (pandas DataFrame): dataset.
-            train (boolean): whether or not X is the training set or the
-                validation set.
-        Returns:
-            X (numpy array): mapped dataset.
-        """
-        # Make a copy so the original training data remain the same
-        X = X.copy()
-
-        if train:
-            self.user_dict = {uIds: idx for idx, uIds in enumerate(np.sort(X['u_id'].unique()))}
-            self.item_dict = {iIds: idx for idx, iIds in enumerate(np.sort(X['i_id'].unique()))}
-
-        X['u_id'] = X['u_id'].map(self.user_dict)
-        X['i_id'] = X['i_id'].map(self.item_dict)
-
-        # Tag unknown users/items with -1 (when val)
-        X.fillna(-1, inplace=True)
-
-        X['u_id'] = X['u_id'].astype(np.int32)
-        X['i_id'] = X['i_id'].astype(np.int32)
-
-        return X[['u_id', 'i_id', 'rating']].values
-
-    def _sgd(self, X, X_val, pu, qi, bu, bi):
+    def _sgd(self, X, X_val, pu, qi, bu, bi, yj):
         """Performs SGD algorithm, learns model weights.
         Args:
             X (numpy array): training set, first column must contains users
@@ -88,23 +30,31 @@ class svd:
             qi (numpy array): items latent factor matrix.
             bu (numpy array): users biases vector.
             bi (numpy array): items biases vector.
+            yj (numpy array): The implicit item factors.
         """
+        I = [[int(i) for u, i, _ in X if u == user]
+                for user in np.unique(X[:,0])
+        ]
+        self.I = np.full((np.unique(X[:,0]).shape[0], max([len(x) for x in I])), -1)
+        for i, v in enumerate(I):
+            self.I[i][0:len(v)] = v
+
         for epoch_ix in range(self.n_epochs):
             start = self._on_epoch_begin(epoch_ix)
 
             if self.shuffle:
                 X = _shuffle(X)
 
-            pu, qi, bu, bi, train_loss = _run_svd_epoch(
-                                X, pu, qi, bu, bi, self.global_mean, self.n_factors,
-                                self.lr_pu, self.lr_qi, self.lr_bu, self.lr_bi,
-                                self.reg_pu, self.reg_qi, self.reg_bu, self.reg_bi
+            pu, qi, bu, bi, yj, train_loss = _run_svdpp_epoch(
+                                X, pu, qi, bu, bi, yj, self.global_mean, self.n_factors, self.I,
+                                self.lr_pu, self.lr_qi, self.lr_bu, self.lr_bi, self.lr_yj,
+                                self.reg_pu, self.reg_qi, self.reg_bu, self.reg_bi, self.reg_yj
                             )
 
             if X_val is not None:
-                self.metrics_[epoch_ix, :] = _compute_svd_val_metrics(X_val, pu, qi, bu, bi,
+                self.metrics_[epoch_ix, :] = _compute_svdpp_val_metrics(X_val, pu, qi, bu, bi, yj,
                                                                   self.global_mean,
-                                                                  self.n_factors)
+                                                                  self.n_factors, self.I)
                 self._on_epoch_end(start,
                                    train_loss=train_loss,
                                    val_loss=self.metrics_[epoch_ix, 0],
@@ -122,6 +72,7 @@ class svd:
         self.qi = qi
         self.bu = bu
         self.bi = bi
+        self.yj = yj
 
     @timer(text='\nTraining took ')
     def fit(self, X, X_val=None, i_factor=None, u_factor=None, early_stopping=False, shuffle=False, min_delta=0.001):
@@ -154,7 +105,7 @@ class svd:
 
         self.global_mean = np.mean(X[:, 2])
 
-        # Initialize pu, qi, bu, bi
+        # Initialize pu, qi, bu, bi, yj
         n_user = len(np.unique(X[:, 0]))
         n_item = len(np.unique(X[:, 1]))
 
@@ -171,8 +122,10 @@ class svd:
         bu = np.zeros(n_user)
         bi = np.zeros(n_item)
 
+        yj = np.random.normal(0, .1, (n_item, self.n_factors))
+
         print('Start training...')
-        self._sgd(X, X_val, pu, qi, bu, bi)
+        self._sgd(X, X_val, pu, qi, bu, bi, yj)
         print("Done.")
 
         return self
@@ -180,8 +133,7 @@ class svd:
     @timer(text='\nTraining took ')
     def load_checkpoint_and_fit(self, checkpoint, X, X_val=None, early_stopping=False, shuffle=False, min_delta=0.001):
         """
-        Load a checkpoint and continue training from that checkpoint.
-        The model should be save as two separate file with the same path and the same name, one .npz and one .pkl
+        Load a .pkl checkpoint and continue training from that checkpoint
         Args:
             checkpoint (string): path to .pkl checkpoint file.
             X (pandas DataFrame): training set, must have `u_id` for user id,
@@ -211,6 +163,7 @@ class svd:
         qi = data['qi']
         bu = data['bu']
         bi = data['bi']
+        yj = data['yj']
 
         print(f"Load checkpoint from {checkpoint} successfully.")
 
@@ -223,7 +176,7 @@ class svd:
         self.global_mean = np.mean(X[:, 2])
 
         print('Start training...')
-        self._sgd(X, X_val, pu, qi, bu, bi)
+        self._sgd(X, X_val, pu, qi, bu, bi, yj)
         print("Done.")
 
         return self
@@ -241,7 +194,8 @@ class svd:
             'pu' : self.pu,
             'qi' : self.qi,
             'bu' : self.bu,
-            'bi' : self.bi
+            'bi' : self.bi,
+            'yj' : self.yj
         }
 
         with open(path, mode='wb') as map_dict:
@@ -252,7 +206,7 @@ class svd:
     def predict_pair(self, u_id, i_id, clip=True):
         """Returns the model rating prediction for a given user/item pair.
         Args:
-            u_id (int): a user id.
+            u_id (int): an user id.
             i_id (int): an item id.
             clip (boolean, default is `True`): whether to clip the prediction
                 or not.
@@ -273,7 +227,19 @@ class svd:
             pred += self.bi[i_ix]
 
         if user_known and item_known:
-            pred += np.dot(self.pu[u_ix], self.qi[i_ix])
+            # Items rated by user u
+            Iu = self.I[u_ix]
+            Iu = Iu[Iu >= 0]
+            # Square root of number of items rated by user u
+            sqrt_Iu = np.sqrt(len(Iu))
+
+            # compute user implicit feedback
+            u_impl_fdb = np.zeros(self.n_factors)
+            for j in Iu:
+                for factor in range(self.n_factors):
+                    u_impl_fdb[factor] += self.yj[j, factor] / sqrt_Iu
+
+            pred += np.dot(self.qi[i_ix], self.pu[u_ix] + u_impl_fdb)
 
         if clip:
             pred = self.max_rating if pred > self.max_rating else pred
@@ -297,60 +263,3 @@ class svd:
             predictions.append(self.predict_pair(u_id, i_id))
 
         return predictions
-
-    def _early_stopping(self, list_val_rmse, epoch_idx, min_delta):
-        """Returns True if validation rmse is not improving.
-        Last rmse (plus `min_delta`) is compared with the second to last.
-        Agrs:
-            list_val_rmse (list): ordered validation RMSEs.
-            min_delta (float): minimun delta to arg for an improvement.
-        Returns:
-            (boolean): whether or not to stop training.
-        """
-        if epoch_idx > 0:
-            if list_val_rmse[epoch_idx] + min_delta > list_val_rmse[epoch_idx-1]:
-                self.metrics_ = self.metrics_[:(epoch_idx+1), :]
-                return True
-        return False
-
-    def _on_epoch_begin(self, epoch_ix):
-        """Displays epoch starting log and returns its starting time.
-        Args:
-            epoch_ix: integer, epoch index.
-        Returns:
-            start (float): starting time of the current epoch.
-        """
-        start = time.time()
-        end = '  | ' if epoch_ix < 9 else ' | '
-        print('Epoch {}/{}'.format(epoch_ix + 1, self.n_epochs), end=end)
-
-        return start
-
-    def _on_epoch_end(self, start, train_loss, val_loss=None, val_rmse=None, val_mae=None):
-        """
-        Displays epoch ending log. If self.verbose compute and display
-        validation metrics (loss/rmse/mae).
-        # Arguments
-            start (float): starting time of the current epoch.
-            train_loss: float, training loss
-            val_loss: float, validation loss
-            val_rmse: float, validation rmse
-            val_mae: float, validation mae
-        """
-        end = time.time()
-
-        print('train_loss: {:.4f}'.format(train_loss), end=' - ')
-        if val_loss is not None:
-            print('val_loss: {:.4f}'.format(val_loss), end=' - ')
-            print('val_rmse: {:.4f}'.format(val_rmse), end=' - ')
-            print('val_mae: {:.4f}'.format(val_mae), end=' - ')
-
-        print('took {:.2f} sec'.format(end - start))
-
-    def get_val_metrics(self):
-        """Get validation metrics
-        Returns:
-            a Pandas DataFrame
-        """
-        if isinstance(self.metrics_, np.ndarray) and (self.metrics_.shape[1] == 3):
-            return pd.DataFrame(self.metrics_, columns=["Loss", "RMSE", "MAE"])
