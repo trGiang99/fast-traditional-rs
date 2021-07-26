@@ -3,12 +3,12 @@ from numba import njit
 
 
 @njit
-def _predict(x_id, y_id, y_rated, S, k, k_min):
+def _predict(x_id, y_id, x_rated_y, S, k, k_min):
     """Predict rating of user x for item y (if iiCF).
     Args:
         x_id (int): users Id    (if iiCF)
         y_id (int): items Id    (if iiCF)
-        y_rated (ndarray): List where element `i` is ndarray of `(xs, rating)` where `xs` is all x that rated y and the ratings.
+        x_rated_y (ndarray): List where element `i` is ndarray of `(xs, rating)` where `xs` is all x that rated y and the ratings.
         S (ndarray): similarity matrix
         k (int): number of k-nearest neighbors
         k_min (int): number of minimum k
@@ -19,7 +19,7 @@ def _predict(x_id, y_id, y_rated, S, k, k_min):
     k_neighbors = np.zeros((k, 2))
     k_neighbors[:, 1] = -1          # All similarity degree is default to -1
 
-    for x2, rating in y_rated:
+    for x2, rating in x_rated_y:
         if int(x2) == x_id:
             continue       # Bo qua item dang xet
         sim = S[int(x2), x_id]
@@ -45,12 +45,12 @@ def _predict(x_id, y_id, y_rated, S, k, k_min):
 
 
 @njit
-def _predict_mean(x_id, y_id, y_rated, mu, S, k, k_min):
+def _predict_mean(x_id, y_id, x_rated_y, mu, S, k, k_min):
     """Predict rating of user x for item y (if iiCF).
     Args:
         x_id (int): users Id    (if iiCF)
         y_id (int): items Id    (if iiCF)
-        y_rated (ndarray): List where element `i` is ndarray of `(xs, rating)` where `xs` is all x that rated y and the ratings.
+        x_rated_y (ndarray): List where element `i` is ndarray of `(xs, rating)` where `xs` is all x that rated y and the ratings.
         mu (ndarray): List of mean ratings of all user (if iiCF, or all item if uuCF).
         S (ndarray): similarity matrix
         k (int): number of k-nearest neighbors
@@ -62,7 +62,7 @@ def _predict_mean(x_id, y_id, y_rated, mu, S, k, k_min):
     k_neighbors = np.zeros((k, 3))
     k_neighbors[:, 1] = -1          # All similarity degree is default to -1
 
-    for x2, rating in y_rated:
+    for x2, rating in x_rated_y:
         if int(x2) == x_id:
             continue       # Bo qua item dang xet
         sim = S[int(x2), x_id]
@@ -89,12 +89,12 @@ def _predict_mean(x_id, y_id, y_rated, mu, S, k, k_min):
 
 
 @njit
-def _predict_baseline(x_id, y_id, y_rated, S, k, k_min, global_mean, bx, by):
+def _predict_baseline(x_id, y_id, x_rated_y, S, k, k_min, global_mean, bx, by):
     """Predict rating of user x for item y (if iiCF) using baseline estimate.
     Args:
         x_id (int): users Id    (if iiCF)
         y_id (int): items Id    (if iiCF)
-        y_rated (ndarray): List where element `i` is ndarray of `(xs, rating)` where `xs` is all x that rated y and the ratings.
+        x_rated_y (ndarray): List where element `i` is ndarray of `(xs, rating)` where `xs` is all x that rated y and the ratings.
         X (ndarray): the training set with size (|TRAINSET|, 3)
         S (ndarray): similarity matrix
         k (int): number of k-nearest neighbors
@@ -109,7 +109,7 @@ def _predict_baseline(x_id, y_id, y_rated, S, k, k_min, global_mean, bx, by):
     k_neighbors = np.zeros((k, 3))
     k_neighbors[:, 1] = -1          # All similarity degree is default to -1
 
-    for x2, rating in y_rated:
+    for x2, rating in x_rated_y:
         if int(x2) == x_id:
             continue       # Bo qua item dang xet
         sim = S[int(x2), x_id]
