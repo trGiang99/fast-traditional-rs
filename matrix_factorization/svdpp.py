@@ -7,13 +7,13 @@ import pickle
 
 from utils import timer
 from .helper import _run_svdpp_epoch, _compute_svdpp_val_metrics, _shuffle
-from .svd import svd
+from .svd import SVD
 
-class svdpp(svd):
+class SVDpp(SVD):
     def __init__(self, learning_rate=.005, lr_pu=None, lr_qi=None, lr_bu=None, lr_bi=None, lr_yj=None,
                  regularization=0.02, reg_pu=None, reg_qi=None, reg_bu=None, reg_bi=None, reg_yj=None,
                  n_epochs=20, n_factors=100, min_rating=1, max_rating=5, i_factor=None, u_factor=None):
-        svd.__init__(self, learning_rate, lr_pu, lr_qi, lr_bu, lr_bi,
+        SVD.__init__(self, learning_rate, lr_pu, lr_qi, lr_bu, lr_bi,
                  regularization, reg_pu, reg_qi, reg_bu, reg_bi,
                  n_epochs, n_factors, min_rating, max_rating, i_factor, u_factor)
         self.lr_yj = lr_yj if lr_yj is not None else learning_rate
@@ -32,10 +32,15 @@ class svdpp(svd):
             bi (numpy array): items biases vector.
             yj (numpy array): The implicit item factors.
         """
-        I = [[int(i) for u, i, _ in X if u == user]
-                for user in np.unique(X[:,0])
-        ]
-        self.I = np.full((np.unique(X[:,0]).shape[0], max([len(x) for x in I])), -1)
+        I = [[] for _ in range(self.n_users)]
+        for u, i, _ in X:
+            I[int(u)].append(int(i))
+
+        # I = [[int(i) for u, i, _ in X if u == user]
+        #         for user in np.unique(X[:,0])
+        # ]
+
+        self.I = np.full((np.unique(X[:,0]).shape[0], max([len(x) for x in I]) + 1), -1)
         for i, v in enumerate(I):
             self.I[i][0:len(v)] = v
 
@@ -46,7 +51,7 @@ class svdpp(svd):
                 X = _shuffle(X)
 
             pu, qi, bu, bi, yj, train_loss = _run_svdpp_epoch(
-                                X, pu, qi, bu, bi, yj, self.global_mean, self.n_factors, self.I,
+                                X, pu, qi, bu, bi, yj, self.global_mean, self.n_factors, self.I.copy(),
                                 self.lr_pu, self.lr_qi, self.lr_bu, self.lr_bi, self.lr_yj,
                                 self.reg_pu, self.reg_qi, self.reg_bu, self.reg_bi, self.reg_yj
                             )
@@ -97,32 +102,32 @@ class svdpp(svd):
         self.shuffle = shuffle
         self.min_delta_ = min_delta
 
-        print('\nPreprocessing data...')
-        X = self._preprocess_data(X)
+        self.users_list = np.unique(X[:, 0])
+        self.items_list = np.unique(X[:, 1])
+
         if X_val is not None:
             self.metrics_ = np.zeros((self.n_epochs, 3), dtype=np.float)
-            X_val = self._preprocess_data(X_val, train=False)
 
         self.global_mean = np.mean(X[:, 2])
 
         # Initialize pu, qi, bu, bi, yj
-        n_user = len(np.unique(X[:, 0]))
-        n_item = len(np.unique(X[:, 1]))
+        self.n_users = self.users_list.shape[0]
+        self.n_items = self.items_list.shape[0]
 
         if i_factor is not None:
             qi = i_factor
         else:
-            qi = np.random.normal(0, .1, (n_item, self.n_factors))
+            qi = np.random.normal(0, .1, (self.n_items, self.n_factors))
 
         if u_factor is not None:
             pu = u_factor
         else:
-            pu = np.random.normal(0, .1, (n_user, self.n_factors))
+            pu = np.random.normal(0, .1, (self.n_users, self.n_factors))
 
-        bu = np.zeros(n_user)
-        bi = np.zeros(n_item)
+        bu = np.zeros(self.n_users)
+        bi = np.zeros(self.n_items)
 
-        yj = np.random.normal(0, .1, (n_item, self.n_factors))
+        yj = np.random.normal(0, .1, (self.n_items, self.n_factors))
 
         print('Start training...')
         self._sgd(X, X_val, pu, qi, bu, bi, yj)
@@ -157,8 +162,6 @@ class svdpp(svd):
         with open(checkpoint[:-4]+'.pkl', mode='rb') as map_dict:
             data = pickle.load(map_dict)
 
-        self.item_dict = data['item_dict']
-        self.user_dict = data['user_dict']
         pu = data['pu']
         qi = data['qi']
         bu = data['bu']
@@ -167,11 +170,11 @@ class svdpp(svd):
 
         print(f"Load checkpoint from {checkpoint} successfully.")
 
-        print('\nPreprocessing data...')
-        X = self._preprocess_data(X, train=False)
+        self.users_list = np.unique(self.X[:, 0])
+        self.items_list = np.unique(self.X[:, 1])
+
         if X_val is not None:
             self.metrics_ = np.zeros((self.n_epochs, 3), dtype=np.float)
-            X_val = self._preprocess_data(X_val, train=False)
 
         self.global_mean = np.mean(X[:, 2])
 
@@ -189,8 +192,6 @@ class svdpp(svd):
             path (string): path to .npz file.
         """
         checkpoint = {
-            'user_dict': self.user_dict,
-            'item_dict' : self.item_dict,
             'pu' : self.pu,
             'qi' : self.qi,
             'bu' : self.bu,
@@ -216,20 +217,19 @@ class svdpp(svd):
         user_known, item_known = False, False
         pred = self.global_mean
 
-        if u_id in self.user_dict:
+        if u_id in self.users_list:
             user_known = True
-            u_ix = self.user_dict[u_id]
-            pred += self.bu[u_ix]
+            pred += self.bu[u_id]
 
-        if i_id in self.item_dict:
+        if i_id in self.items_list:
             item_known = True
-            i_ix = self.item_dict[i_id]
-            pred += self.bi[i_ix]
+            pred += self.bi[i_id]
 
         if user_known and item_known:
             # Items rated by user u
-            Iu = self.I[u_ix]
-            Iu = Iu[Iu >= 0]
+            last_ele = np.where(self.I[u_id] == -1)[0][0]
+            Iu = self.I[u_id, :last_ele]
+
             # Square root of number of items rated by user u
             sqrt_Iu = np.sqrt(len(Iu))
 
@@ -239,27 +239,10 @@ class svdpp(svd):
                 for factor in range(self.n_factors):
                     u_impl_fdb[factor] += self.yj[j, factor] / sqrt_Iu
 
-            pred += np.dot(self.qi[i_ix], self.pu[u_ix] + u_impl_fdb)
+            pred += np.dot(self.qi[i_id], self.pu[u_id] + u_impl_fdb)
 
         if clip:
             pred = self.max_rating if pred > self.max_rating else pred
             pred = self.min_rating if pred < self.min_rating else pred
 
         return pred
-
-    def predict(self, X):
-        """Returns estimated ratings of several given user/item pairs.
-        Args:
-            X (pandas DataFrame): storing all user/item pairs we want to
-                predict the ratings. Must contains columns labeled `u_id` and
-                `i_id`.
-        Returns:
-            predictions: list, storing all predictions of the given user/item
-                pairs.
-        """
-        predictions = []
-
-        for u_id, i_id in zip(X['u_id'], X['i_id']):
-            predictions.append(self.predict_pair(u_id, i_id))
-
-        return predictions

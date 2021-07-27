@@ -138,8 +138,9 @@ def _run_svdpp_epoch(X, pu, qi, bu, bi, yj, global_mean, n_factors, I, lr_pu, lr
         user, item, rating = int(X[i, 0]), int(X[i, 1]), X[i, 2]
 
         # Items rated by user u
-        Iu = I[user]
-        Iu = Iu[Iu >= 0]
+        last_ele = np.where(I[user] == -1)[0][0]
+        Iu = I[user, :last_ele]
+
         # Square root of number of items rated by user u
         sqrt_Iu = np.sqrt(Iu.shape[0])
 
@@ -199,7 +200,9 @@ def _compute_svdpp_val_metrics(X_val, pu, qi, bu, bi, yj, global_mean, n_factors
 
         # Items rated by user u
         Iu = I[user]
-        Iu = Iu[Iu >= 0]
+        last_ele = np.where(Iu == -1)[0][0]
+        Iu = Iu[:last_ele]
+
         # Square root of number of items rated by user u
         sqrt_Iu = np.sqrt(Iu.shape[0])
 
