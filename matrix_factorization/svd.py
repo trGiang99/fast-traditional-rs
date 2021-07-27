@@ -6,10 +6,10 @@ import time
 import pickle
 
 from utils import timer
-from .svd_helper import _run_epoch, _compute_val_metrics, _shuffle
+from .helper import _run_svd_epoch, _compute_svd_val_metrics, _shuffle
 
 
-class svd:
+class SVD:
     """Implements Simon Funk SVD algorithm engineered during the Netflix Prize.
     Attributes:
         lr (float): learning rate.
@@ -50,33 +50,6 @@ class svd:
         self.metrics_ = None
         self.min_delta_ = 0.001
 
-    def _preprocess_data(self, X, train=True):
-        """Maps users and items ids to indexes and returns a numpy array.
-        Args:
-            X (pandas DataFrame): dataset.
-            train (boolean): whether or not X is the training set or the
-                validation set.
-        Returns:
-            X (numpy array): mapped dataset.
-        """
-        # Make a copy so the original training data remain the same
-        X = X.copy()
-
-        if train:
-            self.user_dict = {uIds: idx for idx, uIds in enumerate(np.sort(X['u_id'].unique()))}
-            self.item_dict = {iIds: idx for idx, iIds in enumerate(np.sort(X['i_id'].unique()))}
-
-        X['u_id'] = X['u_id'].map(self.user_dict)
-        X['i_id'] = X['i_id'].map(self.item_dict)
-
-        # Tag unknown users/items with -1 (when val)
-        X.fillna(-1, inplace=True)
-
-        X['u_id'] = X['u_id'].astype(np.int32)
-        X['i_id'] = X['i_id'].astype(np.int32)
-
-        return X[['u_id', 'i_id', 'rating']].values
-
     def _sgd(self, X, X_val, pu, qi, bu, bi):
         """Performs SGD algorithm, learns model weights.
         Args:
@@ -95,14 +68,14 @@ class svd:
             if self.shuffle:
                 X = _shuffle(X)
 
-            pu, qi, bu, bi, train_loss = _run_epoch(
+            pu, qi, bu, bi, train_loss = _run_svd_epoch(
                                 X, pu, qi, bu, bi, self.global_mean, self.n_factors,
                                 self.lr_pu, self.lr_qi, self.lr_bu, self.lr_bi,
                                 self.reg_pu, self.reg_qi, self.reg_bu, self.reg_bi
                             )
 
             if X_val is not None:
-                self.metrics_[epoch_ix, :] = _compute_val_metrics(X_val, pu, qi, bu, bi,
+                self.metrics_[epoch_ix, :] = _compute_svd_val_metrics(X_val, pu, qi, bu, bi,
                                                                   self.global_mean,
                                                                   self.n_factors)
                 self._on_epoch_end(start,
@@ -142,22 +115,24 @@ class svd:
         Returns:
             self (SVD object): the current fitted object.
         """
+        X = X.copy()
+
         self.early_stopping = early_stopping
         self.shuffle = shuffle
         self.min_delta_ = min_delta
 
-        print('\nPreprocessing data...')
-        X = self._preprocess_data(X)
         if X_val is not None:
+            X_val = X_val.copy()
             self.metrics_ = np.zeros((self.n_epochs, 3), dtype=np.float)
-            X_val = self._preprocess_data(X_val, train=False)
 
         self.global_mean = np.mean(X[:, 2])
 
-        # Initialize pu, qi, bu, bi
-        n_user = len(np.unique(X[:, 0]))
-        n_item = len(np.unique(X[:, 1]))
+        self.users_list = np.unique(X[:, 0])
+        self.items_list = np.unique(X[:, 1])
+        n_user = self.users_list.shape[0]
+        n_item = self.items_list.shape[0]
 
+        # Initialize pu, qi, bu, bi
         if i_factor is not None:
             qi = i_factor
         else:
@@ -205,8 +180,9 @@ class svd:
         with open(checkpoint[:-4]+'.pkl', mode='rb') as map_dict:
             data = pickle.load(map_dict)
 
-        self.item_dict = data['item_dict']
-        self.user_dict = data['user_dict']
+        self.users_list = np.unique(X[:, 0])
+        self.items_list = np.unique(X[:, 1])
+
         pu = data['pu']
         qi = data['qi']
         bu = data['bu']
@@ -214,11 +190,8 @@ class svd:
 
         print(f"Load checkpoint from {checkpoint} successfully.")
 
-        print('\nPreprocessing data...')
-        X = self._preprocess_data(X, train=False)
         if X_val is not None:
             self.metrics_ = np.zeros((self.n_epochs, 3), dtype=np.float)
-            X_val = self._preprocess_data(X_val, train=False)
 
         self.global_mean = np.mean(X[:, 2])
 
@@ -229,15 +202,12 @@ class svd:
         return self
 
     def save_checkpoint(self, path):
-        """Save the model parameter (Pu, Qi, bu, bi)
-        and two mapping dictionary (user_dict, item_dict) to a .pkl file.
+        """Save the model parameter (Pu, Qi, bu, bi) to a .pkl file.
 
         Args:
             path (string): path to .npz file.
         """
         checkpoint = {
-            'user_dict': self.user_dict,
-            'item_dict' : self.item_dict,
             'pu' : self.pu,
             'qi' : self.qi,
             'bu' : self.bu,
@@ -262,18 +232,16 @@ class svd:
         user_known, item_known = False, False
         pred = self.global_mean
 
-        if u_id in self.user_dict:
+        if u_id in self.users_list:
             user_known = True
-            u_ix = self.user_dict[u_id]
-            pred += self.bu[u_ix]
+            pred += self.bu[u_id]
 
-        if i_id in self.item_dict:
+        if i_id in self.items_list:
             item_known = True
-            i_ix = self.item_dict[i_id]
-            pred += self.bi[i_ix]
+            pred += self.bi[i_id]
 
         if user_known and item_known:
-            pred += np.dot(self.pu[u_ix], self.qi[i_ix])
+            pred += np.dot(self.pu[u_id], self.qi[i_id])
 
         if clip:
             pred = self.max_rating if pred > self.max_rating else pred
@@ -291,12 +259,14 @@ class svd:
             predictions: list, storing all predictions of the given user/item
                 pairs.
         """
-        predictions = []
+        n_pairs = X.shape[0]
 
-        for u_id, i_id in zip(X['u_id'], X['i_id']):
-            predictions.append(self.predict_pair(u_id, i_id))
+        self.predictions = np.empty(n_pairs)
 
-        return predictions
+        for pair in range(n_pairs):
+            self.predictions[pair] = self.predict_pair(X[pair, 0].astype(int), X[pair, 1].astype(int))
+
+        return self.predictions
 
     def _early_stopping(self, list_val_rmse, epoch_idx, min_delta):
         """Returns True if validation rmse is not improving.
@@ -339,11 +309,11 @@ class svd:
         """
         end = time.time()
 
-        print('train_loss: {:.4f}'.format(train_loss), end=' - ')
+        print('train_loss: {:.5f}'.format(train_loss), end=' - ')
         if val_loss is not None:
-            print('val_loss: {:.4f}'.format(val_loss), end=' - ')
-            print('val_rmse: {:.4f}'.format(val_rmse), end=' - ')
-            print('val_mae: {:.4f}'.format(val_mae), end=' - ')
+            print('val_loss: {:.5f}'.format(val_loss), end=' - ')
+            print('val_rmse: {:.5f}'.format(val_rmse), end=' - ')
+            print('val_mae: {:.5f}'.format(val_mae), end=' - ')
 
         print('took {:.2f} sec'.format(end - start))
 
