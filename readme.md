@@ -25,6 +25,6 @@ Size of the extracted dataset can be changed via `sample_size`.
 
 ## Benchmarks
 
-Folder `/example` contains test runs on MovieLens 20M dataset.
+Folder `/example` contains test runs on MovieLens dataset.
 
-Compare to [NicolasHug/Surprise](https://github.com/NicolasHug/Surprise), the runtime of kNNBaseline using Pearson similarity scores is much faster (817s compared to 3166s of Surprise).
+Compare to [NicolasHug/Surprise](https://github.com/NicolasHug/Surprise), the runtime of kNNBaseline using Pearson similarity scores is much faster (817s compared to 3166s of Surprise on MovieLens 20M dataset).
