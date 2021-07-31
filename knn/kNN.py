@@ -15,6 +15,7 @@ class kNN:
         uuCF (boolean, optional): True if using user-based CF, False if using item-based CF. Defaults to `False`.
         verbose (boolean): Show predicting progress. Defaults to `False`.
         awareness_constrain (boolean): If `True`, the model must aware of all users and items in the test set, which means that these users and items are in the train set as well. This constrain helps speed up the predicting process (up to 1.5 times) but if a user of an item is unknown, kNN will fail to give prediction. Defaults to `False`.
+        S (ndarray): Similarity matrix. Initialized to None.
     """
     def __init__(self, min_k=1, uuCF=False, verbose=False, awareness_constrain=False):
         self.min_k = min_k
@@ -23,6 +24,8 @@ class kNN:
 
         self.verbose = verbose
         self.awareness_constrain = awareness_constrain
+
+        self.S = None
 
     def fit(self, train_set, similarity_measure="cosine", genome=None, similarity_matrix=None):
         """Fit data (utility matrix) into the predicting model.

@@ -117,5 +117,8 @@ class kNNBaseline(kNN):
 
         kNN.compute_similarity_matrix(self, similarity_measure, genome, similarity_matrix)
 
-        if self.similarity_measure == "pearson_baseline":
+        if self.S is not None:
+            return
+
+        if similarity_measure == "pearson_baseline":
             self.S = _pcc_baseline(self.n_x, self.x_rated, self.global_mean, self.bx, self.by, shrinkage, min_support=self.min_k)
