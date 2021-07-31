@@ -34,7 +34,7 @@ class kNNBaseline(kNN):
 
         self.list_ur_ir()
 
-        self.__baseline(baseline_options)
+        self.baseline(baseline_options)
 
         self.supported_sim_func = ["cosine", "pearson", "pearson_baseline"]
         self.compute_similarity_matrix(similarity_measure, genome, shrinkage, similarity_matrix)
@@ -67,7 +67,7 @@ class kNNBaseline(kNN):
         return pred
 
     @timer("Time for computing the baseline estimate: ")
-    def __baseline(self, baseline_options):
+    def baseline(self, baseline_options):
         """Compute the baseline estimate for all user and movie using the following fomular.
         b_{ui} = \mu + b_u + b_i
         """
