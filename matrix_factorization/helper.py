@@ -10,27 +10,29 @@ def _shuffle(X):
 @njit
 def _run_svd_epoch(X, pu, qi, bu, bi, global_mean, n_factors, lr_pu, lr_qi, lr_bu, lr_bi, reg_pu, reg_qi, reg_bu, reg_bi):
     """Runs an SVD epoch, updating model weights (pu, qi, bu, bi).
+
     Args:
-        X (numpy array): training set.
-        pu (numpy array): users latent factor matrix.
-        qi (numpy array): items latent factor matrix.
-        bu (numpy array): users biases vector.
-        bi (numpy array): items biases vector.
+        X (ndarray): the training set.
+        pu (ndarray): users latent factor matrix.
+        qi (ndarray): items latent factor matrix.
+        bu (ndarray): users biases vector.
+        bi (ndarray): items biases vector.
         global_mean (float): ratings arithmetic mean.
         n_factors (int): number of latent factors.
-        lr_pu (float): the learning rate for Pu.
-        lr_qi (float): the learning rate for Qi.
-        lr_bu (float): the learning rate for bu.
-        lr_bi (float): the learning rate for bi.
-        reg_pu (float): regularization factor for Pu.
-        reg_qi (float): regularization factor for Qi.
-        reg_bu (float): regularization factor for bu.
-        reg_bi (float): regularization factor for bi.
+        lr_pu (float, optional): Pu's specific learning rate.
+        lr_qi (float, optional): Qi's specific learning rate.
+        lr_bu (float, optional): bu's specific learning rate.
+        lr_bi (float, optional): bi's specific learning rate.
+        reg_pu (float, optional): Pu's specific regularization term.
+        reg_qi (float, optional): Qi's specific regularization term.
+        reg_bu (float, optional): bu's specific regularization term.
+        reg_bi (float, optional): bi's specific regularization term.
+
     Returns:
-        pu (numpy array): users latent factor matrix updated.
-        qi (numpy array): items latent factor matrix updated.
-        bu (numpy array): users biases vector updated.
-        bi (numpy array): items biases vector updated.
+        pu (ndarray): the updated users latent factor matrix.
+        qi (ndarray): the updated items latent factor matrix.
+        bu (ndarray): the updated users biases vector.
+        bi (ndarray): the updated items biases vector.
         train_loss (float): training loss.
     """
     residuals = []
@@ -66,14 +68,16 @@ def _run_svd_epoch(X, pu, qi, bu, bi, global_mean, n_factors, lr_pu, lr_qi, lr_b
 @njit
 def _compute_svd_val_metrics(X_val, pu, qi, bu, bi, global_mean, n_factors):
     """Computes validation metrics (loss, rmse, and mae) for SVD.
+
     Args:
-        X_val (numpy array): validation set.
-        pu (numpy array): users latent factor matrix.
-        qi (numpy array): items latent factor matrix.
-        bu (numpy array): users biases vector.
-        bi (numpy array): items biases vector.
+        X_val (ndarray): the validation set.
+        pu (ndarray): users latent factor matrix.
+        qi (ndarray): items latent factor matrix.
+        bu (ndarray): users biases vector.
+        bi (ndarray): items biases vector.
         global_mean (float): ratings arithmetic mean.
         n_factors (int): number of latent factors.
+
     Returns:
         (tuple of floats): validation loss, rmse and mae.
     """
@@ -106,14 +110,15 @@ def _compute_svd_val_metrics(X_val, pu, qi, bu, bi, global_mean, n_factors):
 @njit
 def _run_svdpp_epoch(X, pu, qi, bu, bi, yj, global_mean, n_factors, I, lr_pu, lr_qi, lr_bu, lr_bi, lr_yj, reg_pu, reg_qi, reg_bu, reg_bi, reg_yj):
     """Runs an SVD++ epoch, updating model weights (pu, qi, bu, bi).
+
     Args:
-        X (numpy array): training set.
-        pu (numpy array): users latent factor matrix.
-        qi (numpy array): items latent factor matrix.
-        bu (numpy array): users biases vector.
-        bi (numpy array): items biases vector.
-        bi (numpy array): items biases vector.
-        yj (numpy array): The implicit item factors.
+        X (ndarray): training set.
+        pu (ndarray): users latent factor matrix.
+        qi (ndarray): items latent factor matrix.
+        bu (ndarray): users biases vector.
+        bi (ndarray): items biases vector.
+        bi (ndarray): items biases vector.
+        yj (ndarray): The implicit item factors.
         global_mean (float): ratings arithmetic mean.
         n_factors (int): number of latent factors.
         lr_pu (float): the learning rate for Pu.
@@ -126,11 +131,12 @@ def _run_svdpp_epoch(X, pu, qi, bu, bi, yj, global_mean, n_factors, I, lr_pu, lr
         reg_bu (float): regularization factor for bu.
         reg_bi (float): regularization factor for bi.
         reg_yj (float): regularization factor for yj.
+
     Returns:
-        pu (numpy array): users latent factor matrix updated.
-        qi (numpy array): items latent factor matrix updated.
-        bu (numpy array): users biases vector updated.
-        bi (numpy array): items biases vector updated.
+        pu (ndarray): users latent factor matrix updated.
+        qi (ndarray): items latent factor matrix updated.
+        bu (ndarray): users biases vector updated.
+        bi (ndarray): items biases vector updated.
         train_loss (float): training loss.
     """
     residuals = []
@@ -181,15 +187,17 @@ def _run_svdpp_epoch(X, pu, qi, bu, bi, yj, global_mean, n_factors, I, lr_pu, lr
 @njit
 def _compute_svdpp_val_metrics(X_val, pu, qi, bu, bi, yj, global_mean, n_factors, I):
     """Computes validation metrics (loss, rmse, and mae) for SVD++.
+
     Args:
-        X_val (numpy array): validation set.
-        pu (numpy array): users latent factor matrix.
-        qi (numpy array): items latent factor matrix.
-        bu (numpy array): users biases vector.
-        bi (numpy array): items biases vector.
-        yj (numpy array): The implicit item factors.
+        X_val (ndarray): validation set.
+        pu (ndarray): users latent factor matrix.
+        qi (ndarray): items latent factor matrix.
+        bu (ndarray): users biases vector.
+        bi (ndarray): items biases vector.
+        yj (ndarray): The implicit item factors.
         global_mean (float): ratings arithmetic mean.
         n_factors (int): number of latent factors.
+
     Returns:
         (tuple of floats): validation loss, rmse and mae.
     """
