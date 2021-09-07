@@ -15,6 +15,7 @@ class kNN:
         uuCF (boolean, optional): True if using user-based CF, False if using item-based CF. Defaults to `False`.
         verbose (boolean): Show predicting progress. Defaults to `False`.
         awareness_constrain (boolean): If `True`, the model must aware of all users and items in the test set, which means that these users and items are in the train set as well. This constrain helps speed up the predicting process (up to 1.5 times) but if a user of an item is unknown, kNN will fail to give prediction. Defaults to `False`.
+        S (ndarray): Similarity matrix. Initialized to None.
     """
     def __init__(self, min_k=1, uuCF=False, verbose=False, awareness_constrain=False):
         self.min_k = min_k
@@ -24,50 +25,23 @@ class kNN:
         self.verbose = verbose
         self.awareness_constrain = awareness_constrain
 
+        self.S = None
+
     def fit(self, train_set, similarity_measure="cosine", genome=None, similarity_matrix=None):
         """Fit data (utility matrix) into the predicting model.
 
         Args:
             train_set (ndarray): Training data.
             similarity_measure (str, optional): Similarity measure function. Defaults to "cosine".
-            genome (ndarray): Movie genome scores from MovieLens 20M. Defaults to "None".
-            similarity_matrix (ndarray): Pre-calculate similarity matrix.  Defaults to "None".
+            genome (ndarray, optional): Movie genome scores from MovieLens 20M. Defaults to "None".
+            similarity_matrix (ndarray, optional): Pre-calculate similarity matrix.  Defaults to "None".
         """
-        self.X = train_set.copy()
+        self.fit_train_set(train_set)
 
-        if not self.uuCF:
-            self.X[:, [0, 1]] = self.X[:, [1, 0]]     # Swap user_id column to movie_id column if using iiCF
-
-        self.global_mean = np.mean(self.X[:, 2])
-
-        self.x_list = np.unique(self.X[:, 0])       # For uuCF, x -> user
-        self.y_list = np.unique(self.X[:, 1])       # For uuCF, y -> item
-
-        self.n_x = len(self.x_list)
-        self.n_y = len(self.y_list)
-
-        print("Listing all users rated each item, and all items rated by each user ...")
         self.list_ur_ir()
 
-        if similarity_matrix is None:
-            print('Computing similarity matrix ...')
-
-            self.__supported_sim_func = ["cosine", "pearson"]
-            assert similarity_measure in self.__supported_sim_func, f"Similarity measure function should be one of {self.__supported_sim_func}"
-            self.__similarity_measure = similarity_measure
-
-            if self.__similarity_measure == "cosine":
-                if genome is not None:
-                    self.S = _cosine_genome(genome)
-                else:
-                    self.S = _cosine(self.n_x, self.x_rated)
-            elif self.__similarity_measure == "pearson":
-                if genome is not None:
-                    self.S = _pcc_genome(genome)
-                else:
-                    self.S = _pcc(self.n_x, self.x_rated)
-        else:
-            self.S = similarity_matrix
+        self.supported_sim_func = ["cosine", "pearson"]
+        self.compute_similarity_matrix(similarity_measure, genome, similarity_matrix)
 
     @timer("Time for predicting: ")
     def predict(self, test_set, k, min_rating=0.5, max_rating=5, clip=True):
@@ -167,6 +141,25 @@ class kNN:
         mae_ = np.mean(np.abs(self.predictions - self.ground_truth))
         print(f"MAE: {mae_:.5f}")
 
+    def fit_train_set(self, train_set):
+        """Get useful attribute from the training set such as rating mean, user and item list, number of users and items.
+
+        Args:
+            train_set (ndarray): Training data.
+        """
+        self.X = train_set.copy()
+
+        if not self.uuCF:
+            self.X[:, [0, 1]] = self.X[:, [1, 0]]     # Swap user_id column to movie_id column if using iiCF
+
+        self.global_mean = np.mean(self.X[:, 2])
+
+        self.x_list = np.unique(self.X[:, 0])       # For uuCF, x -> user
+        self.y_list = np.unique(self.X[:, 1])       # For uuCF, y -> item
+
+        self.n_x = len(self.x_list)
+        self.n_y = len(self.y_list)
+
     @timer("Listing took ")
     def list_ur_ir(self):
         """Listing all users rated each item, and all items rated by each user.
@@ -175,6 +168,9 @@ class kNN:
         All items who rated by each user are stored in list `y_ratedby`.
         The denotation are reversed if iiCF.
         """
+
+        print("Listing all users rated each item, and all items rated by each user ...")
+
         self.x_rated = [[] for _ in range(self.n_y)]        # List where element `i` is ndarray of `(x, rating)` where `x` is all x that rated y, and the ratings.
         self.y_ratedby = [[] for _ in range(self.n_x)]      # List where element `i` is ndarray of `(y, rating)` where `y` is all y that rated by x, and the ratings.
 
@@ -186,3 +182,32 @@ class kNN:
             self.x_rated[yid] = np.array(self.x_rated[yid])
         for xid in range(self.n_x):
             self.y_ratedby[xid] = np.array(self.y_ratedby[xid])
+
+    def compute_similarity_matrix(self, similarity_measure, genome, similarity_matrix):
+        """Computing the similarity matrix for kNN.
+
+        Args:
+            similarity_measure (str, optional): Similarity measure function. Defaults to "cosine".
+            genome (ndarray, optional): Movie genome scores from MovieLens 20M. If "None", the similarity matrix will be computed using rating information, else using the genome vectors to calculate. Defaults to "None".
+            similarity_matrix (ndarray, optional): Pre-calculate similarity matrix.  Defaults to "None".
+        """
+
+        if similarity_matrix is not None:
+            self.S = similarity_matrix      # Directly assign the precomputed similarity matrix to self.S
+            return
+
+        print('Computing similarity matrix ...')
+        assert similarity_measure in self.supported_sim_func, f"Similarity measure function should be one of {self.supported_sim_func}"
+        self.similarity_measure = similarity_measure
+
+        if self.similarity_measure == "cosine":
+            if genome is not None:
+                self.S = _cosine_genome(genome)
+            else:
+                self.S = _cosine(self.n_x, self.x_rated, min_support=self.min_k)
+
+        if self.similarity_measure == "pearson":
+            if genome is not None:
+                self.S = _pcc_genome(genome)
+            else:
+                self.S = _pcc(self.n_x, self.x_rated, min_support=self.min_k)
