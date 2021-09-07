@@ -9,6 +9,7 @@
 /movielens-sample/*
 /movielens10k/*
 /movielens100k/*
+/netflixprize/*
 
 # Testing folder
 /svd_knn/*
