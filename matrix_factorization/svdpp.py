@@ -22,15 +22,15 @@ class SVDpp(SVD):
     def _sgd(self, X, X_val, pu, qi, bu, bi, yj):
         """Performs SGD algorithm, learns model weights.
         Args:
-            X (numpy array): training set, first column must contains users
+            X (ndarray): training set, first column must contains users
                 indexes, second one items indexes, and third one ratings.
-            X_val (numpy array or `None`): validation set with same structure
+            X_val (ndarray or `None`): validation set with same structure
                 as X.
-            pu (numpy array): users latent factor matrix.
-            qi (numpy array): items latent factor matrix.
-            bu (numpy array): users biases vector.
-            bi (numpy array): items biases vector.
-            yj (numpy array): The implicit item factors.
+            pu (ndarray): users latent factor matrix.
+            qi (ndarray): items latent factor matrix.
+            bu (ndarray): users biases vector.
+            bi (ndarray): items biases vector.
+            yj (ndarray): The implicit item factors.
         """
         I = [[] for _ in range(self.n_users)]
         for u, i, _ in X:

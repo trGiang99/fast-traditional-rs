@@ -11,24 +11,42 @@ from .helper import _run_svd_epoch, _compute_svd_val_metrics, _shuffle
 
 class SVD:
     """Implements Simon Funk SVD algorithm engineered during the Netflix Prize.
+
     Attributes:
         lr (float): learning rate.
         reg (float): regularization factor.
         n_epochs (int): number of SGD iterations.
         n_factors (int): number of latent factors.
         global_mean (float): ratings arithmetic mean.
-        pu (numpy array): users latent factor matrix.
-        qi (numpy array): items latent factor matrix.
-        bu (numpy array): users biases vector.
-        bi (numpy array): items biases vector.
-        early_stopping (boolean): whether or not to stop training based on a
-            validation monitoring.
+        pu (ndarray): users latent factor matrix.
+        qi (ndarray): items latent factor matrix.
+        bu (ndarray): users biases vector.
+        bi (ndarray): items biases vector.
+        early_stopping (boolean): whether or not to stop training based on a validation monitoring.
         shuffle (boolean): whether or not to shuffle data before each epoch.
     """
 
     def __init__(self, learning_rate=.005, lr_pu=None, lr_qi=None, lr_bu=None, lr_bi=None,
                  regularization=0.02, reg_pu=None, reg_qi=None, reg_bu=None, reg_bi=None,
-                 n_epochs=20, n_factors=100, min_rating=1, max_rating=5, i_factor=None, u_factor=None):
+                 n_epochs=20, n_factors=100, min_rating=0.5, max_rating=5):
+        """SVD model
+
+        Args:
+            learning_rate (float, optional): the common learning rate. Defaults to .005.
+            lr_pu (float, optional): Pu's specific learning rate. Defaults to learning_rate.
+            lr_qi (float, optional): Qi's specific learning rate. Defaults to learning_rate.
+            lr_bu (float, optional): bu's specific learning rate. Defaults to learning_rate.
+            lr_bi (float, optional): bi's specific learning rate. Defaults to learning_rate.
+            regularization (float, optional): the common regularization term. Defaults to 0.02.
+            reg_pu (float, optional): Pu's specific regularization term. Defaults to regularization.
+            reg_qi (float, optional): Qi's specific regularization term. Defaults to regularization.
+            reg_bu (float, optional): bu's specific regularization term. Defaults to regularization.
+            reg_bi (float, optional): bi's specific regularization term. Defaults to regularization.
+            n_epochs (int, optional): number of SGD iterations. Defaults to 20.
+            n_factors (int, optional): number of latent factors. Defaults to 100.
+            min_rating (float, optional): the minimum value of predicted rating. Defaults to 0.5.
+            max_rating (float, optional): the maximum value of predicted rating. Defaults to 5.
+        """
 
         self.lr_pu = lr_pu if lr_pu is not None else learning_rate
         self.lr_qi = lr_qi if lr_qi is not None else learning_rate
@@ -52,15 +70,15 @@ class SVD:
 
     def _sgd(self, X, X_val, pu, qi, bu, bi):
         """Performs SGD algorithm, learns model weights.
+
         Args:
-            X (numpy array): training set, first column must contains users
+            X (ndarray): training set, first column must contains users
                 indexes, second one items indexes, and third one ratings.
-            X_val (numpy array or `None`): validation set with same structure
-                as X.
-            pu (numpy array): users latent factor matrix.
-            qi (numpy array): items latent factor matrix.
-            bu (numpy array): users biases vector.
-            bi (numpy array): items biases vector.
+            X_val (ndarray, optional): validation set with same structure as X. Defaults to None.
+            pu (ndarray): users latent factor matrix.
+            qi (ndarray): items latent factor matrix.
+            bu (ndarray): users biases vector.
+            bi (ndarray): items biases vector.
         """
         for epoch_ix in range(self.n_epochs):
             start = self._on_epoch_begin(epoch_ix)
@@ -99,19 +117,17 @@ class SVD:
     @timer(text='\nTraining took ')
     def fit(self, X, X_val=None, i_factor=None, u_factor=None, early_stopping=False, shuffle=False, min_delta=0.001):
         """Learns model weights.
+
         Args:
-            X (pandas DataFrame): training set, must have `u_id` for user id,
+            X (ndarray): training set, must have `u_id` for user id,
                 `i_id` for item id and `rating` columns.
-            X_val (pandas DataFrame, defaults to `None`): validation set with
-                same structure as X.
-            i_factor (pandas DataFrame, defaults to `None`): initialization for Qi. The dimension should match self.factor
-            u_factor (pandas DataFrame, defaults to `None`): initialization for Pu. The dimension should match self.factor
-            early_stopping (boolean): whether or not to stop training based on
-                a validation monitoring.
-            shuffle (boolean): whether or not to shuffle the training set
-                before each epoch.
-            min_delta (float, defaults to .001): minimun delta to arg for an
-                improvement.
+            X_val (ndarray): validation set with same structure as X. Defaults to `None`
+            i_factor (ndarray): initialization for Qi. Defaults to `None`
+            u_factor (ndarray): initialization for Pu. Defaults to `None`
+            early_stopping (boolean): whether or not to stop training based on a validation monitoring.
+            shuffle (boolean): whether or not to shuffle the training set before each epoch.
+            min_delta (float, defaults to .001): minimun delta to arg for an improvement.
+
         Returns:
             self (SVD object): the current fitted object.
         """
@@ -157,18 +173,15 @@ class SVD:
         """
         Load a checkpoint and continue training from that checkpoint.
         The model should be save as two separate file with the same path and the same name, one .npz and one .pkl
+
         Args:
             checkpoint (string): path to .pkl checkpoint file.
-            X (pandas DataFrame): training set, must have `u_id` for user id,
-                `i_id` for item id and `rating` columns.
-            X_val (pandas DataFrame, defaults to `None`): validation set with
-                same structure as X.
-            early_stopping (boolean): whether or not to stop training based on
-                a validation monitoring.
-            shuffle (boolean): whether or not to shuffle the training set
-                before each epoch.
-            min_delta (float, defaults to .001): minimun delta to arg for an
-                improvement.
+            X (ndarray): training set, must have first column for user id, second column for item id and the last is rating column.
+            X_val (ndarray): validation set with same structure as X. Defaults to None.
+            early_stopping (boolean): whether or not to stop training based on a validation monitoring.
+            shuffle (boolean): whether or not to shuffle the training set before each epoch.
+            min_delta (float, defaults to .001): minimun delta to arg for an improvement.
+
         Returns:
             self (SVD object): the current fitted object.
         """
@@ -221,11 +234,12 @@ class SVD:
 
     def predict_pair(self, u_id, i_id, clip=True):
         """Returns the model rating prediction for a given user/item pair.
+
         Args:
             u_id (int): a user id.
             i_id (int): an item id.
-            clip (boolean, default is `True`): whether to clip the prediction
-                or not.
+            clip (boolean, default is `True`): whether to clip the prediction or not.
+
         Returns:
             pred (float): the estimated rating for the given user/item pair.
         """
@@ -251,13 +265,12 @@ class SVD:
 
     def predict(self, X):
         """Returns estimated ratings of several given user/item pairs.
+
         Args:
-            X (pandas DataFrame): storing all user/item pairs we want to
-                predict the ratings. Must contains columns labeled `u_id` and
-                `i_id`.
+            X (ndarray): storing all user/item pairs we want to predict the ratings. Must have first column for user id, second column for item id.
+
         Returns:
-            predictions: list, storing all predictions of the given user/item
-                pairs.
+            predictions (ndarray): list, storing all predictions of the given user/item pairs.
         """
         n_pairs = X.shape[0]
 
@@ -271,9 +284,11 @@ class SVD:
     def _early_stopping(self, list_val_rmse, epoch_idx, min_delta):
         """Returns True if validation rmse is not improving.
         Last rmse (plus `min_delta`) is compared with the second to last.
+
         Agrs:
             list_val_rmse (list): ordered validation RMSEs.
             min_delta (float): minimun delta to arg for an improvement.
+
         Returns:
             (boolean): whether or not to stop training.
         """
@@ -285,8 +300,10 @@ class SVD:
 
     def _on_epoch_begin(self, epoch_ix):
         """Displays epoch starting log and returns its starting time.
+
         Args:
             epoch_ix: integer, epoch index.
+
         Returns:
             start (float): starting time of the current epoch.
         """
@@ -300,7 +317,8 @@ class SVD:
         """
         Displays epoch ending log. If self.verbose compute and display
         validation metrics (loss/rmse/mae).
-        # Arguments
+
+        Args:
             start (float): starting time of the current epoch.
             train_loss: float, training loss
             val_loss: float, validation loss
@@ -319,6 +337,7 @@ class SVD:
 
     def get_val_metrics(self):
         """Get validation metrics
+
         Returns:
             a Pandas DataFrame
         """
