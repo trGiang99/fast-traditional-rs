@@ -62,7 +62,7 @@ def _pcc_baseline(n_x, yr, global_mean, bx, by, shrinkage=100, min_support=1):
         prods, freq, sq_diff_i, sq_diff_j = \
             _run_pearson_baseline_params(global_mean, bx, by, prods, freq, sq_diff_i, sq_diff_j, y, y_ratings)
 
-    sim = _calculate_pearson_baseline_similarity(prods, freq, sq_diff_i, sq_diff_j, n_x, shrinkage, min_support)
+    sim = _calculate_pearson_baseline_similarity(prods, freq, sq_diff_i, sq_diff_j, n_x, shrinkage, min_sprt)
 
     return sim
 
