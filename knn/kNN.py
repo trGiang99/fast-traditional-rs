@@ -4,7 +4,7 @@ import numpy as np
 
 from utils import timer
 from .similarities import _cosine, _pcc, _cosine_genome, _pcc_genome
-from .knn_helper import _predict
+from .knn_helper import _predict, _calculate_precision_recall
 
 
 class kNN:
@@ -53,7 +53,7 @@ class kNN:
             max_rating (float): the maximum value for rating prediction.
             clip (boolean): if True, clip the prediction based on the min and max value.
         Returns:
-            predictions (ndarray): Storing all predictions of the given user/item pairs.
+            predictions (ndarray): Storing all predictions of the given user/item pairs. The first column is user id, the second column is item id, the third column is the observed rating, and the forth column is the predicted rating.
         """
         self.k = k
 
@@ -61,10 +61,10 @@ class kNN:
         if not self.uuCF:
             test_set[:, [0, 1]] = test_set[:, [1, 0]]     # Swap user_id column to movie_id column if using iiCF
 
-        self.ground_truth = test_set[:, 2]
         n_pairs = test_set.shape[0]
 
-        self.predictions = np.zeros(n_pairs)
+        self.predictions = np.zeros((n_pairs, test_set.shape[1]+1))
+        self.predictions[:, :3] = test_set
 
         print(f"Predicting {n_pairs} pairs of user-item with k={self.k} ...")
 
@@ -72,15 +72,15 @@ class kNN:
             bar = progressbar.ProgressBar(maxval=n_pairs, widgets=[progressbar.Bar(), ' ', progressbar.Percentage()])
             bar.start()
             for pair in range(n_pairs):
-                self.predictions[pair] = self.predict_pair(test_set[pair, 0].astype(int), test_set[pair, 1].astype(int))
+                self.predictions[pair, 3] = self.predict_pair(test_set[pair, 0].astype(int), test_set[pair, 1].astype(int))
                 bar.update(pair + 1)
             bar.finish()
         else:
             for pair in range(n_pairs):
-                self.predictions[pair] = self.predict_pair(test_set[pair, 0].astype(int), test_set[pair, 1].astype(int))
+                self.predictions[pair, 3] = self.predict_pair(test_set[pair, 0].astype(int), test_set[pair, 1].astype(int))
 
         if clip:
-            np.clip(self.predictions, min_rating, max_rating, out=self.predictions)
+            np.clip(self.predictions[:, 3], min_rating, max_rating, out=self.predictions[:, 3])
 
         return self.predictions
 
@@ -130,7 +130,7 @@ class kNN:
         """Calculate Root Mean Squared Error between the predictions and the ground truth.
         Print the RMSE.
         """
-        mse = np.mean((self.predictions - self.ground_truth)**2)
+        mse = np.mean((self.predictions[:, 2] - self.predictions[:, 3])**2)
         rmse_ = np.sqrt(mse)
         print(f"RMSE: {rmse_:.5f}")
 
@@ -138,8 +138,43 @@ class kNN:
         """Calculate Mean Absolute Error between the predictions and the ground truth.
         Print the MAE.
         """
-        mae_ = np.mean(np.abs(self.predictions - self.ground_truth))
+        mae_ = np.mean(np.abs(self.predictions[:, 2] - self.predictions[:, 3]))
         print(f"MAE: {mae_:.5f}")
+
+    def precision_recall_at_k(self, k=10, threshold=3.5):
+        """Calculate the precision and recall at k metrics.
+
+        Args:
+            k (int, optional): the k metric. Defaults to 10.
+            threshold (float, optional): relevent threshold. Defaults to 3.5.
+        """
+
+        if self.uuCF:
+            n_users = self.n_x
+        else:
+            n_users = self.n_y
+
+        # First map the predictions to each user.
+        user_est_true = [ [] for _ in range(n_users)]
+        for x_id, y_id, true_r, est in self.predictions:
+            if self.uuCF:
+                u_id = int(x_id)
+            else:
+                u_id = int(y_id)
+            user_est_true[u_id].append([est, true_r])
+
+        # precision and recall at k metrics for each user
+        precisions = np.zeros(n_users)
+        recalls = np.zeros(n_users)
+
+        for u_id, user_ratings in enumerate(user_est_true):
+            precisions[u_id], recalls[u_id] = _calculate_precision_recall(np.array(user_ratings), k, threshold)
+
+        precision = sum(prec for prec in precisions) / n_users
+        recall = sum(rec for rec in recalls) / n_users
+
+        print(f"Precision: {precision:.5f}")
+        print(f"Recall: {recall:.5f}")
 
     def fit_train_set(self, train_set):
         """Get useful attribute from the training set such as rating mean, user and item list, number of users and items.
