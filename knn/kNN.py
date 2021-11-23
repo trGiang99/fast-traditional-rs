@@ -4,7 +4,7 @@ import numpy as np
 
 from utils import timer
 from .similarities import _cosine, _pcc, _cosine_genome, _pcc_genome
-from .knn_helper import _predict
+from .knn_helper import _predict, _calculate_precision_recall
 
 
 class kNN:
@@ -142,7 +142,12 @@ class kNN:
         print(f"MAE: {mae_:.5f}")
 
     def precision_recall_at_k(self, k=10, threshold=3.5):
-        """Return precision and recall at k metrics."""
+        """Calculate the precision and recall at k metrics.
+
+        Args:
+            k (int, optional): the k metric. Defaults to 10.
+            threshold (float, optional): relevent threshold. Defaults to 3.5.
+        """
 
         if self.uuCF:
             n_users = self.n_x
@@ -163,28 +168,7 @@ class kNN:
         recalls = np.zeros(n_users)
 
         for u_id, user_ratings in enumerate(user_est_true):
-
-            # Sort user ratings by estimated value
-            user_ratings.sort(key=lambda x: x[0], reverse=True)
-            # user_ratings[user_ratings[:, 1].argsort()]
-
-            # Number of relevant items
-            n_rel = sum((true_r >= threshold) for _, true_r in user_ratings)
-
-            # Number of recommended items in top k
-            n_rec_k = sum((est >= threshold) for est, _ in user_ratings[:k])
-
-            # Number of relevant and recommended items in top k
-            n_rel_and_rec_k = sum(((true_r >= threshold) and (est >= threshold))
-                                for (est, true_r) in user_ratings[:k])
-
-            # Precision@K: Proportion of recommended items that are relevant
-            # When n_rec_k is 0, Precision is undefined. We here set it to 0.
-            precisions[u_id] = n_rel_and_rec_k / n_rec_k if n_rec_k != 0 else 0
-
-            # Recall@K: Proportion of relevant items that are recommended
-            # When n_rel is 0, Recall is undefined. We here set it to 0.
-            recalls[u_id] = n_rel_and_rec_k / n_rel if n_rel != 0 else 0
+            precisions[u_id], recalls[u_id] = _calculate_precision_recall(np.array(user_ratings), k, threshold)
 
         precision = sum(prec for prec in precisions) / n_users
         recall = sum(rec for rec in recalls) / n_users
