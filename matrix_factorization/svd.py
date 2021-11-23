@@ -6,7 +6,7 @@ import time
 import pickle
 
 from utils import timer
-from .helper import _run_svd_epoch, _compute_svd_val_metrics, _shuffle
+from .helper import _run_svd_epoch, _compute_svd_val_metrics, _shuffle, _calculate_precision_recall
 
 
 class SVD:
@@ -232,13 +232,12 @@ class SVD:
 
         print(f"Save checkpoint to {path} successfully.")
 
-    def predict_pair(self, u_id, i_id, clip=True):
+    def predict_pair(self, u_id, i_id):
         """Returns the model rating prediction for a given user/item pair.
 
         Args:
             u_id (int): a user id.
             i_id (int): an item id.
-            clip (boolean, default is `True`): whether to clip the prediction or not.
 
         Returns:
             pred (float): the estimated rating for the given user/item pair.
@@ -257,29 +256,73 @@ class SVD:
         if user_known and item_known:
             pred += np.dot(self.pu[u_id], self.qi[i_id])
 
-        if clip:
-            pred = self.max_rating if pred > self.max_rating else pred
-            pred = self.min_rating if pred < self.min_rating else pred
-
         return pred
 
-    def predict(self, X):
+    def predict(self, X, clip=True):
         """Returns estimated ratings of several given user/item pairs.
 
         Args:
             X (ndarray): storing all user/item pairs we want to predict the ratings. Must have first column for user id, second column for item id.
+            clip (boolean, default is `True`): whether to clip the prediction or not.
 
         Returns:
-            predictions (ndarray): list, storing all predictions of the given user/item pairs.
+            predictions (ndarray): Storing all predictions of the given user/item pairs. The first column is user id, the second column is item id, the third column is the observed rating, and the forth column is the predicted rating.
         """
+        X = X.copy()
         n_pairs = X.shape[0]
 
-        self.predictions = np.empty(n_pairs)
+        self.predictions = np.zeros((n_pairs, X.shape[1]+1))
+        self.predictions[:, :3] = X
 
         for pair in range(n_pairs):
-            self.predictions[pair] = self.predict_pair(X[pair, 0].astype(int), X[pair, 1].astype(int))
+            self.predictions[pair, 3] = self.predict_pair(X[pair, 0].astype(int), X[pair, 1].astype(int))
 
-        return self.predictions
+        if clip:
+            np.clip(self.predictions[:, 3], self.min_rating, self.max_rating, out=self.predictions[:, 3])
+
+        return self.predictions[:, 3]
+
+    def rmse(self):
+        """Calculate Root Mean Squared Error between the predictions and the ground truth.
+        Print the RMSE.
+        """
+        mse = np.mean((self.predictions[:, 2] - self.predictions[:, 3])**2)
+        rmse_ = np.sqrt(mse)
+        print(f"RMSE: {rmse_:.5f}")
+
+    def mae(self):
+        """Calculate Mean Absolute Error between the predictions and the ground truth.
+        Print the MAE.
+        """
+        mae_ = np.mean(np.abs(self.predictions[:, 2] - self.predictions[:, 3]))
+        print(f"MAE: {mae_:.5f}")
+
+    def precision_recall_at_k(self, k=10, threshold=3.5):
+        """Calculate the precision and recall at k metrics.
+        Args:
+            k (int, optional): the k metric. Defaults to 10.
+            threshold (float, optional): relevent threshold. Defaults to 3.5.
+        """
+
+        n_users = self.users_list.shape[0]
+
+        # First map the predictions to each user.
+        user_est_true = [ [] for _ in range(n_users)]
+        for u_id, _, true_r, est in self.predictions:
+            user_est_true[int(u_id)].append([est, true_r])
+
+        # precision and recall at k metrics for each user
+        precisions = np.zeros(n_users)
+        recalls = np.zeros(n_users)
+
+        for u_id, user_ratings in enumerate(user_est_true):
+            precisions[u_id], recalls[u_id] = _calculate_precision_recall(np.array(user_ratings), k, threshold)
+
+        precision = sum(prec for prec in precisions) / n_users
+        recall = sum(rec for rec in recalls) / n_users
+
+        print(f"Precision: {precision:.5f}")
+        print(f"Recall: {recall:.5f}")
 
     def _early_stopping(self, list_val_rmse, epoch_idx, min_delta):
         """Returns True if validation rmse is not improving.
