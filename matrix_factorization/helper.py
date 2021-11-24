@@ -66,6 +66,34 @@ def _run_svd_epoch(X, pu, qi, bu, bi, global_mean, n_factors, lr_pu, lr_qi, lr_b
 
 
 @njit
+def _predict_svd_pair(u_id, i_id, global_mean, bu, bi, pu, qi):
+    """Returns the model rating prediction for a given user/item pair.
+
+    Args:
+        u_id (int): a user id.
+        i_id (int): an item id.
+
+    Returns:
+        pred (float): the estimated rating for the given user/item pair.
+    """
+    user_known, item_known = False, False
+    pred = global_mean
+
+    if u_id != -1:
+        user_known = True
+        pred += bu[u_id]
+
+    if i_id != -1:
+        item_known = True
+        pred += bi[i_id]
+
+    if user_known and item_known:
+        pred += np.dot(pu[u_id], qi[i_id])
+
+    return pred
+
+
+@njit
 def _compute_svd_val_metrics(X_val, pu, qi, bu, bi, global_mean, n_factors):
     """Computes validation metrics (loss, rmse, and mae) for SVD.
 
@@ -239,3 +267,51 @@ def _compute_svdpp_val_metrics(X_val, pu, qi, bu, bi, yj, global_mean, n_factors
     mae = np.absolute(residuals).mean()
 
     return loss, rmse, mae
+
+
+@njit
+def _calculate_precision_recall(user_ratings, k, threshold):
+    """Calculate the precision and recall at k metric for the user based on his/her obversed rating and his/her predicted rating.
+    Args:
+        user_ratings (ndarray): An array contains the predicted rating in the first column and the obversed rating in the second column.
+        k (int): the k metric.
+        threshold (float): relevant threshold.
+    Returns:
+        (precision, recall): the precision and recall score for the user.
+    """
+    # Sort user ratings by estimated value
+    user_ratings = user_ratings[user_ratings[:, 0].argsort()][::-1]
+
+    # Number of relevant items
+    n_rel = 0
+    for _, true_r in user_ratings:
+        if true_r >= threshold:
+            n_rel += 1
+
+    # Number of recommended items in top k
+    n_rec_k = 0
+    for est, _ in user_ratings[:k]:
+        if est >= threshold:
+            n_rec_k += 1
+
+    # Number of relevant and recommended items in top k
+    n_rel_and_rec_k = 0
+    for (est, true_r) in user_ratings[:k]:
+        if true_r >= threshold and est >= threshold:
+            n_rel_and_rec_k += 1
+
+    # Precision@K: Proportion of recommended items that are relevant
+    # When n_rec_k is 0, Precision is undefined. We here set it to 0.
+    if n_rec_k != 0:
+        precision = n_rel_and_rec_k / n_rec_k
+    else:
+        precision = 0
+
+    # Recall@K: Proportion of relevant items that are recommended
+    # When n_rel is 0, Recall is undefined. We here set it to 0.
+    if n_rel != 0:
+        recall = n_rel_and_rec_k / n_rel
+    else:
+        recall = 0
+
+    return precision, recall
