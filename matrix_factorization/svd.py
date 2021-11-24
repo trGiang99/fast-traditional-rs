@@ -6,7 +6,7 @@ import time
 import pickle
 
 from utils import timer
-from .helper import _run_svd_epoch, _compute_svd_val_metrics, _shuffle, _calculate_precision_recall
+from .helper import _run_svd_epoch, _predict_svd_pair, _compute_svd_val_metrics, _shuffle, _calculate_precision_recall
 
 
 class SVD:
@@ -232,32 +232,6 @@ class SVD:
 
         print(f"Save checkpoint to {path} successfully.")
 
-    def predict_pair(self, u_id, i_id):
-        """Returns the model rating prediction for a given user/item pair.
-
-        Args:
-            u_id (int): a user id.
-            i_id (int): an item id.
-
-        Returns:
-            pred (float): the estimated rating for the given user/item pair.
-        """
-        user_known, item_known = False, False
-        pred = self.global_mean
-
-        if u_id in self.users_list:
-            user_known = True
-            pred += self.bu[u_id]
-
-        if i_id in self.items_list:
-            item_known = True
-            pred += self.bi[i_id]
-
-        if user_known and item_known:
-            pred += np.dot(self.pu[u_id], self.qi[i_id])
-
-        return pred
-
     def predict(self, X, clip=True):
         """Returns estimated ratings of several given user/item pairs.
 
@@ -275,7 +249,7 @@ class SVD:
         self.predictions[:, :3] = X
 
         for pair in range(n_pairs):
-            self.predictions[pair, 3] = self.predict_pair(X[pair, 0].astype(int), X[pair, 1].astype(int))
+            self.predictions[pair, 3] = _predict_svd_pair(X[pair, 0].astype(int), X[pair, 1].astype(int), self.global_mean, self.bu, self.bi, self.pu, self.qi)
 
         if clip:
             np.clip(self.predictions[:, 3], self.min_rating, self.max_rating, out=self.predictions[:, 3])

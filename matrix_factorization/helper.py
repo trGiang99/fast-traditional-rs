@@ -66,6 +66,34 @@ def _run_svd_epoch(X, pu, qi, bu, bi, global_mean, n_factors, lr_pu, lr_qi, lr_b
 
 
 @njit
+def _predict_svd_pair(u_id, i_id, global_mean, bu, bi, pu, qi):
+    """Returns the model rating prediction for a given user/item pair.
+
+    Args:
+        u_id (int): a user id.
+        i_id (int): an item id.
+
+    Returns:
+        pred (float): the estimated rating for the given user/item pair.
+    """
+    user_known, item_known = False, False
+    pred = global_mean
+
+    if u_id != -1:
+        user_known = True
+        pred += bu[u_id]
+
+    if i_id != -1:
+        item_known = True
+        pred += bi[i_id]
+
+    if user_known and item_known:
+        pred += np.dot(pu[u_id], qi[i_id])
+
+    return pred
+
+
+@njit
 def _compute_svd_val_metrics(X_val, pu, qi, bu, bi, global_mean, n_factors):
     """Computes validation metrics (loss, rmse, and mae) for SVD.
 
