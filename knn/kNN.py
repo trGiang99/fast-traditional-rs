@@ -173,8 +173,7 @@ class kNN:
         precision = sum(prec for prec in precisions) / n_users
         recall = sum(rec for rec in recalls) / n_users
 
-        print(f"Precision: {precision:.5f}")
-        print(f"Recall: {recall:.5f}")
+        print(f"Precision@{k}: {precision:.5f} - Recall@{k}: {recall:.5f}")
 
     def fit_train_set(self, train_set):
         """Get useful attribute from the training set such as rating mean, user and item list, number of users and items.

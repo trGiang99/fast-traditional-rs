@@ -295,8 +295,7 @@ class SVD:
         precision = sum(prec for prec in precisions) / n_users
         recall = sum(rec for rec in recalls) / n_users
 
-        print(f"Precision: {precision:.5f}")
-        print(f"Recall: {recall:.5f}")
+        print(f"Precision@{k}: {precision:.5f} - Recall@{k}: {recall:.5f}")
 
     def _early_stopping(self, list_val_rmse, epoch_idx, min_delta):
         """Returns True if validation rmse is not improving.
