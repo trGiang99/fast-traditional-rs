@@ -191,7 +191,8 @@ def _calculate_ndcg(user_true_ratings, user_est_ratings, k):
     """Calculate the NDCG at k metric for the user based on his/her obversed rating and his/her predicted rating.
 
     Args:
-        # user_ratings (ndarray): An array contains the predicted rating in the first column and the obversed rating in the second column.
+        user_true_ratings (ndarray): An array contains the predicted rating on the test set.
+        user_est_ratings (ndarray): An array contains the obversed rating on the test set.
         k (int): the k metric.
 
     Returns:
@@ -206,14 +207,18 @@ def _calculate_ndcg(user_true_ratings, user_est_ratings, k):
     return ndcg
 
 @njit
-def dcg(relevance, order):
-    """
-    Calculate discounted cumulative gain.
-    @param relevance: Graded and ordered relevances of the results.
-    @type relevance: C{seq} or C{numpy.array}
+def dcg(ratings, order):
+    """ Calculate discounted cumulative gain.
+
+    Args:
+        ratings (ndarray): the rating of the user on the test set.
+        order (ndarray): list of item id, sorted by the rating.
+
+    Returns:
+        float: the discounted cumulative gain of the user.
     """
     dcg = 0
     for ith, item in enumerate(order):
-        dcg += (np.power(2, relevance[item-1]) - 1) / np.log2(ith + 2)
+        dcg += (np.power(2, ratings[item]) - 1) / np.log2(ith + 2)
 
     return dcg

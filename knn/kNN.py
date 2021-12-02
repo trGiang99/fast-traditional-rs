@@ -145,7 +145,7 @@ class kNN:
         """Calculate the precision and recall at k metrics.
 
         Args:
-            k (int, optional): the k metric. Defaults to 10.
+            k (int, optional): number of ranks to use when calculating NDCG.. Defaults to 10.
             threshold (float, optional): relevent threshold. Defaults to 3.5.
         """
 
@@ -176,6 +176,11 @@ class kNN:
         print(f"Precision@{k}: {precision:.5f} - Recall@{k}: {recall:.5f}")
 
     def ndcg_at_k(self, k=10):
+        """Calculate normalized discounted cumulative gain on the test set.
+
+        Args:
+            k (int, optional): number of ranks to use when calculating NDCG. Defaults to 10.
+        """
 
         if self.uuCF:
             n_users = self.n_x
@@ -198,7 +203,6 @@ class kNN:
 
         for u_id in range(n_users):
             ndcgs[u_id] = _calculate_ndcg(np.array(users_true_rating[u_id]), np.array(users_est_rating[u_id]), k)
-            # print(ndcgs[u_id])
 
         ndcg = sum(ndcg_score for ndcg_score in ndcgs) / n_users
 
