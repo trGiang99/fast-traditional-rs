@@ -4,7 +4,7 @@ import numpy as np
 
 from utils import timer
 from .similarities import _cosine, _pcc, _cosine_genome, _pcc_genome
-from .knn_helper import _predict, _calculate_precision_recall
+from .knn_helper import _predict, _calculate_precision_recall, _calculate_ndcg
 
 
 class kNN:
@@ -145,7 +145,7 @@ class kNN:
         """Calculate the precision and recall at k metrics.
 
         Args:
-            k (int, optional): the k metric. Defaults to 10.
+            k (int, optional): number of ranks to use when calculating NDCG.. Defaults to 10.
             threshold (float, optional): relevent threshold. Defaults to 3.5.
         """
 
@@ -155,7 +155,7 @@ class kNN:
             n_users = self.n_y
 
         # First map the predictions to each user.
-        user_est_true = [ [] for _ in range(n_users)]
+        user_est_true = [ [] for _ in range(n_users) ]
         for x_id, y_id, true_r, est in self.predictions:
             if self.uuCF:
                 u_id = int(x_id)
@@ -174,6 +174,76 @@ class kNN:
         recall = sum(rec for rec in recalls) / n_users
 
         print(f"Precision@{k}: {precision:.5f} - Recall@{k}: {recall:.5f}")
+
+    def ndcg_at_k(self, k=10):
+        """Calculate normalized discounted cumulative gain on the test set.
+
+        Args:
+            k (int, optional): number of ranks to use when calculating NDCG. Defaults to 10.
+        """
+
+        if self.uuCF:
+            n_users = self.n_x
+        else:
+            n_users = self.n_y
+
+        # First map the predictions to each user.
+        users_est_rating = [ [] for _ in range(n_users) ]
+        users_true_rating = [ [] for _ in range(n_users) ]
+        for x_id, y_id, true_r, est in self.predictions:
+            if self.uuCF:
+                u_id = int(x_id)
+            else:
+                u_id = int(y_id)
+            users_est_rating[u_id].append(est)
+            users_true_rating[u_id].append(true_r)
+
+        # ndcg score of each user
+        ndcgs = np.zeros(n_users)
+
+        for u_id in range(n_users):
+            ndcgs[u_id] = _calculate_ndcg(np.array(users_true_rating[u_id]), np.array(users_est_rating[u_id]), k)
+
+        ndcg = sum(ndcg_score for ndcg_score in ndcgs) / n_users
+
+        print(f"NDCG@{k}: {ndcg:.5f}")
+
+    def get_top_N_recommendation(self, n=10, criterion='estimated_rating'):
+        """Return the top-N recommendation for each user from a set of predictions.
+
+        Args:
+            n (int, optional): The number of recommendation to output for each user. Defaults to 10.
+            criterion (str, optional): The criterion to get top-N recommendation. Only \"observed_rating\" or \"estimated_rating\" are accepted. Defaults to 'estimated_rating'.
+
+        Returns:
+            (list): top-N recommendation for each user.
+        """
+        assert criterion in ['observed_rating', 'estimated_rating'], "The critiation should be \"observed_rating\" or \"estimated_rating\"."
+
+        if self.uuCF:
+            n_users = self.n_x
+        else:
+            n_users = self.n_y
+
+        if criterion == 'estimated_rating':
+            criterion_idx = 3
+        elif criterion == 'observed_rating':
+            criterion_idx = 3
+
+        top_N = [ [] for _ in range(n_users) ]
+        for row in self.predictions:
+            if self.uuCF:
+                u_id, i_id = int(row[0]), int(row[1])
+            else:
+                u_id, i_id = int(row[1]), int(row[0])
+
+            top_N[u_id].append([i_id, row[criterion_idx]])
+
+        for u_id, ratings in enumerate(top_N):
+            ratings.sort(key=lambda x: x[1], reverse=True)
+            top_N[u_id] = ratings[:n]
+
+        return top_N
 
     def fit_train_set(self, train_set):
         """Get useful attribute from the training set such as rating mean, user and item list, number of users and items.

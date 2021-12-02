@@ -185,3 +185,40 @@ def _calculate_precision_recall(user_ratings, k, threshold):
         recall = 0
 
     return precision, recall
+
+@njit
+def _calculate_ndcg(user_true_ratings, user_est_ratings, k):
+    """Calculate the NDCG at k metric for the user based on his/her obversed rating and his/her predicted rating.
+
+    Args:
+        user_true_ratings (ndarray): An array contains the predicted rating on the test set.
+        user_est_ratings (ndarray): An array contains the obversed rating on the test set.
+        k (int): the k metric.
+
+    Returns:
+        ndcg: the ndcg score for the user.
+    """
+    # Sort user ratings by estimated value
+    user_true_ratings_order = user_true_ratings.argsort()[::-1][:k]
+    user_est_ratings_order = user_est_ratings.argsort()[::-1][:k]
+
+    ndcg = dcg(user_est_ratings, user_est_ratings_order) / dcg(user_true_ratings, user_true_ratings_order)
+
+    return ndcg
+
+@njit
+def dcg(ratings, order):
+    """ Calculate discounted cumulative gain.
+
+    Args:
+        ratings (ndarray): the rating of the user on the test set.
+        order (ndarray): list of item id, sorted by the rating.
+
+    Returns:
+        float: the discounted cumulative gain of the user.
+    """
+    dcg = 0
+    for ith, item in enumerate(order):
+        dcg += (np.power(2, ratings[item]) - 1) / np.log2(ith + 2)
+
+    return dcg
