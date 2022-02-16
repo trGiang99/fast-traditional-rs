@@ -24,35 +24,28 @@ class DataLoader:
         self.__val_data = None
         self.__test_data = None
 
-    def __read_trainset(self, columns):
-        self.__train_data = pd.read_csv(
-            self.__data_folder + "/rating_train.csv",
+    def __read_csv(self, path, columns):
+        return pd.read_csv(
+            self.__data_folder + "/" + path,
             header=0, names=columns
         )
 
-        self.user_dict = {uIds: idx for idx, uIds in enumerate(np.sort(self.__train_data['u_id'].unique()))}
-        self.item_dict = {iIds: idx for idx, iIds in enumerate(np.sort(self.__train_data['i_id'].unique()))}
-        self.__train_data = self.__preprocess(self.__train_data)
+    def __create_id_mapping(self):
+        if self.__val_data:
+            unique_uIds = pd.concat([self.__train_data.u_id, self.__test_data.u_id, self.__val_data.u_id]).unique()
+            unique_iIds = pd.concat([self.__train_data.i_id, self.__test_data.i_id, self.__val_data.i_id]).unique()
+        else:
+            unique_uIds = pd.concat([self.__train_data.u_id, self.__test_data.u_id]).unique()
+            unique_iIds = pd.concat([self.__train_data.i_id, self.__test_data.i_id]).unique()
 
-    def __read_testset(self, columns):
-        self.__test_data = pd.read_csv(
-            self.__data_folder + "/rating_test.csv",
-            header=0, names=columns
-        )
-        self.__test_data = self.__preprocess(self.__test_data)
-
-    def __read_valset(self, columns):
-        self.__val_data = pd.read_csv(
-            self.__data_folder + "/rating_val.csv",
-            header=0, names=columns
-        )
-        self.__val_data = self.__preprocess(self.__val_data)
+        self.user_dict = {uId: idx for idx, uId in enumerate(unique_uIds)}
+        self.item_dict = {iId: idx for idx, iId in enumerate(unique_iIds)}
 
     def __preprocess(self, data):
         """Map the id of all users and items according to user_dict and item_dict.
         To create the user_dict, all user ID in the training set is first sorted, then the first ID is map to 0 and so on.
         Do the same for item_dict.
-        This process is done via `self.__read_trainset()`.
+        This process is done via `self.__create_id_mapping()`.
 
         Args:
             data (Dataframe): The dataset that need to be preprocessed.
@@ -74,23 +67,34 @@ class DataLoader:
 
         return data[['u_id', 'i_id', 'rating']].values
 
-    def load_csv2ndarray(self, use_val=False, columns=['u_id', 'i_id', 'rating', 'timestamp']):
+    def load_csv2ndarray(self, train_path="rating_train.csv", test_path="rating_test.csv", val_path="rating_val.csv",  use_val=False, columns=['u_id', 'i_id', 'rating', 'timestamp']):
         """
         Load training set, validate set and test set via `.csv` file.
         Each as `ndarray`.
 
         Args:
-            has_val (boolean): Denote if loading validate data or not. Defaults to True.
+            train_path (string): path to the training set csv file inside self.__data_folder
+            test_path (string): path to the testing set csv file inside self.__data_folder
+            val_path (string): path to the validating set csv file inside self.__data_folder
+            use_val (boolean): Denote if loading validate data or not. Defaults to False.
             columns (list): Columns name for DataFrame. Defaults to ['u_id', 'i_id', 'rating', 'timestamp'].
 
         Returns:
             train, val, test (np.array): Preprocessed data.
         """
-        self.__read_trainset(columns)
-        self.__read_testset(columns)
+        self.__train_data = self.__read_csv(train_path, columns)
+        self.__test_data = self.__read_csv(test_path, columns)
 
         if use_val:
-            self.__read_valset(columns)
+            self.__val_data = self.__read_csv(val_path, columns)
+
+        self.__create_id_mapping()
+
+        self.__train_data = self.__preprocess(self.__train_data)
+        self.__test_data = self.__preprocess(self.__test_data)
+
+        if use_val:
+            self.__val_data = self.__preprocess(self.__val_data)
             return self.__train_data, self.__val_data, self.__test_data
         else:
             return self.__train_data, self.__test_data
